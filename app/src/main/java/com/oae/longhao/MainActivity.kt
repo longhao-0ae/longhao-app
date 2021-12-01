@@ -10,10 +10,7 @@ import com.oae.longhao.ui.theme.LonghaoTheme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.*
-import androidx.compose.ui.Modifier
 
 import android.util.Log
 import androidx.activity.compose.setContent
@@ -26,56 +23,42 @@ import android.content.pm.PackageManager
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
 import java.util.*
 import kotlin.concurrent.schedule
+import android.os.Build
+import android.view.WindowInsetsController
 
-private lateinit var fusedLocationClient : FusedLocationProviderClient
+
+private lateinit var locationCallback: LocationCallback
 
 class MainActivity : ComponentActivity(){
-    //1 = health,2=plugged,3=level
-    val powervariable = mutableMapOf(1 to "", 2 to Boolean, 3 to 9999)
+    private lateinit var fusedLocationClient : FusedLocationProviderClient
+    // level = 1,plugged = 2
+    val powerVariable = mutableMapOf(1 to 9999, 2 to Boolean)
+    // latitude = 1,longitude = 2,altitude = 3
+    val locationVariable = mutableMapOf(1 to 0.0,2 to 0.0,3 to 0.0)
     //,FragmentManager.OnBackStackChangedListener {
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         //画面常時オン
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         //ナビゲーションバーとステータスバー隠す
-        window.decorView.apply {
-            systemUiVisibility =
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            window.decorView.systemUiVisibility =
+                (View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+            window.decorView.windowInsetsController?.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+            window.decorView.windowInsetsController?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
-            var mylist: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
+        var mylist: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
-        //バッテリ系
+        //バッテリ
         val intentfilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        // //これサブスクみたいなのが増え続けてるんでは
         registerReceiver(BatteryReceiver, intentfilter)
-
-
-        fusedLocationClient = FusedLocationProviderClient(this)
-
-        // どのような取得方法を要求
-        val locationRequest = LocationRequest().apply {
-            // 精度重視(電力大)と省電力重視(精度低)を両立するため2種類の更新間隔を指定
-            // 今回は公式のサンプル通りにする。
-            interval = 10000                                   // 最遅の更新間隔(但し正確ではない。)
-            fastestInterval = 5000                             // 最短の更新間隔
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY  // 精度重視
-        }
-        val locationCallback = object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult?) {
-                // 更新直後の位置が格納されているはず
-                val location = locationResult?.lastLocation ?: return
-                Toast.makeText(this@MainActivity,
-                    "緯度:${location.latitude}, 経度:${location.longitude}", Toast.LENGTH_LONG).show()
-            }
-        }
 
         //位置情報の権限チェック
         if (ActivityCompat.checkSelfPermission(
@@ -95,13 +78,38 @@ class MainActivity : ComponentActivity(){
             // for ActivityCompat#requestPermissions for more details.
             return
         }
+
+        fusedLocationClient = FusedLocationProviderClient(this)
+        val locationRequest = LocationRequest().apply {
+            // 精度重視(電力大)と省電力重視(精度低)を両立するため2種類の更新間隔を指定
+            // 今回は公式のサンプル通り
+            interval = 10000                                   // 最遅の更新間隔(但し不正確)
+            fastestInterval = 5000                             // 最短の更新間隔
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY  // 精度重視
+        }
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult?) {
+                if (locationResult == null) {
+                    return
+                }
+                for (location in locationResult.locations) {
+                    if (location != null) {
+                        locationVariable[1] = location.latitude
+                        locationVariable[2] = location.longitude
+                        locationVariable[3] = location.altitude
+                        Log.v("updated","gps")
+                    }
+                }
+            }
+        }
         /// 位置情報を更新
-        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.myLooper())
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback,Looper.myLooper())
 
 
         Timer().schedule(0, 5000) {
-            Log.v("nullpo", "ga")
             GetBatterylebel()
+            GetLocation()
             //   this.cancel()
         }
 
@@ -162,12 +170,13 @@ class MainActivity : ComponentActivity(){
                     Column {
                     greeting("Android")
                    buttontest()
-                        MessageList(seriallist = mylist)
+                        MessageList(serialList = mylist)
                     }
                 }
             }
         }
-    }/*
+    }
+    /*
     override fun onNewData(data: ByteArray) {
         Log.v("TerminalFragment", "onNewData")
     }*/
@@ -177,45 +186,17 @@ class MainActivity : ComponentActivity(){
             val bm = applicationContext.getSystemService(BATTERY_SERVICE) as BatteryManager
             val batLevel:Int = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
             val batteryPlugged = bm.isCharging
-
-            powervariable[3] = batLevel
-            powervariable[2] = batteryPlugged
-            // Log.v("batterylevel","Current battery charge\n$Batterylevel%")
-            /* val batteryLevel = getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-            val batteryPlugged = getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-            val batteryHealth = getIntExtra(BatteryManager.EXTRA_HEALTH, -1)
-            Log.d("Battery", "Level: $batteryLevel")
-            Log.d("Battery", "Ifplugged: ${batteryPluggCheck(batteryPlugged)}")
-            Log.d("Battery", "Health: ${batteryHealthCheck(batteryHealth)}")*/
-
+            powerVariable[1] = batLevel
+            powerVariable[2] = batteryPlugged
         }
     }
-
-    private fun batteryHealthCheck(bh: Int): String? {
-        var health: String? = null
-        if (bh == BatteryManager.BATTERY_HEALTH_GOOD) {
-            health = "GOOD"
-        } else if (bh == BatteryManager.BATTERY_HEALTH_DEAD) {
-            health = "DEAD"
-        } else if (bh == BatteryManager.BATTERY_HEALTH_COLD) {
-            health = "COLD"
-        } else if (bh == BatteryManager.BATTERY_HEALTH_OVERHEAT) {
-            health = "OVERHEAT"
-        } else if (bh == BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE) {
-            health = "OVER_VOLTAGE"
-        } else if (bh == BatteryManager.BATTERY_HEALTH_UNKNOWN) {
-            health = "UNKNOWN"
-        } else if (bh == BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE) {
-            health = "UNSPECIFIED_FAILURE"
-        }
-        return health
+    private fun GetLocation(){
+        Log.v("gps-latitude",locationVariable[1].toString())
     }
 
-
-
-    fun GetBatterylebel(){
-        Log.v("plugged",powervariable[2].toString())
-        Log.v("level",powervariable[3].toString())
+    private fun GetBatterylebel(){
+        Log.v("plugged",powerVariable[2].toString())
+        Log.v("level",powerVariable[1].toString())
     }
 
     @Composable
@@ -227,17 +208,14 @@ class MainActivity : ComponentActivity(){
     fun buttontest() {
         Button(
             onClick = { /* ... */ },
-            // Uses ButtonDefaults.ContentPadding by default
         ){
-                // Inner content including an icon and a text label
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text("Like")
             }
     }
     @Composable
-    fun MessageList(seriallist: MutableList<String>) {
+    fun MessageList(serialList: MutableList<String>) {
         Column { 
-            seriallist.forEach { message ->
+            serialList.forEach { message ->
                 MessageRow(message)
             }
         }
