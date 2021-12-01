@@ -1,8 +1,8 @@
 package com.oae.longhao
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
-import android.hardware.usb.UsbDevice
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 
@@ -14,15 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.*
 import androidx.compose.ui.Modifier
-import com.hoho.android.usbserial.driver.UsbSerialPort
 
-import android.hardware.usb.UsbDeviceConnection
-
-import com.hoho.android.usbserial.driver.UsbSerialDriver
-
-import com.hoho.android.usbserial.driver.UsbSerialProber
-
-import android.hardware.usb.UsbManager
 import android.util.Log
 import androidx.activity.compose.setContent
 import android.os.BatteryManager
@@ -37,24 +29,33 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
+import java.util.*
+import kotlin.concurrent.schedule
 
 private lateinit var fusedLocationClient : FusedLocationProviderClient
 
 class MainActivity : ComponentActivity(){
+    //1 = health,2=plugged,3=level
+    val powervariable = mutableMapOf(1 to "", 2 to Boolean, 3 to 9999)
     //,FragmentManager.OnBackStackChangedListener {
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         //画面常時オン
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-//ナビゲーションバーとステータスバー隠す
+        //ナビゲーションバーとステータスバー隠す
         window.decorView.apply {
             systemUiVisibility =
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN
         }
+
             var mylist: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
-
+        //バッテリ系
+        val intentfilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        // //これサブスクみたいなのが増え続けてるんでは
+        registerReceiver(BatteryReceiver, intentfilter)
 
 
         fusedLocationClient = FusedLocationProviderClient(this)
@@ -97,20 +98,12 @@ class MainActivity : ComponentActivity(){
         /// 位置情報を更新
         fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.myLooper())
 
-        //バッテリ系
-        val intentfilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val batteryStatus = this.registerReceiver(null, intentfilter)
 
-        val batteryLevel = batteryStatus!!.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-        val batteryPlugged = batteryStatus.getIntExtra(
-            BatteryManager.EXTRA_PLUGGED, -1
-        )
-        val batteryHealth = batteryStatus.getIntExtra(
-            BatteryManager.EXTRA_HEALTH, -1
-        )
-        Log.d("Battery", "Level: $batteryLevel")
-        Log.d("Battery", "Ifplugged: ${batteryPluggCheck(batteryPlugged)}")
-        Log.d("Battery", "Health: ${batteryHealthCheck(batteryHealth)}")
+        Timer().schedule(0, 5000) {
+            Log.v("nullpo", "ga")
+            GetBatterylebel()
+            //   this.cancel()
+        }
 
         /*   val READ_WAIT_MILLIS = 2000
        // var usbSerialPort: UsbSerialPort? = null
@@ -178,6 +171,26 @@ class MainActivity : ComponentActivity(){
     override fun onNewData(data: ByteArray) {
         Log.v("TerminalFragment", "onNewData")
     }*/
+
+    private val BatteryReceiver: BroadcastReceiver = object: BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val bm = applicationContext.getSystemService(BATTERY_SERVICE) as BatteryManager
+            val batLevel:Int = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            val batteryPlugged = bm.isCharging
+
+            powervariable[3] = batLevel
+            powervariable[2] = batteryPlugged
+            // Log.v("batterylevel","Current battery charge\n$Batterylevel%")
+            /* val batteryLevel = getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val batteryPlugged = getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+            val batteryHealth = getIntExtra(BatteryManager.EXTRA_HEALTH, -1)
+            Log.d("Battery", "Level: $batteryLevel")
+            Log.d("Battery", "Ifplugged: ${batteryPluggCheck(batteryPlugged)}")
+            Log.d("Battery", "Health: ${batteryHealthCheck(batteryHealth)}")*/
+
+        }
+    }
+
     private fun batteryHealthCheck(bh: Int): String? {
         var health: String? = null
         if (bh == BatteryManager.BATTERY_HEALTH_GOOD) {
@@ -198,17 +211,13 @@ class MainActivity : ComponentActivity(){
         return health
     }
 
-    private fun batteryPluggCheck(bpl: Int): String? {
-        var plugged = "NOT PLUGGED"
-        if (bpl == BatteryManager.BATTERY_PLUGGED_AC) {
-            plugged = "PLUGGED AC"
-        } else if (bpl == BatteryManager.BATTERY_PLUGGED_USB) {
-            plugged = "PLUGGED USB"
-        } else if (bpl == BatteryManager.BATTERY_PLUGGED_WIRELESS) {
-            plugged = "PLUGGED WIRELESS"
-        }
-        return plugged
+
+
+    fun GetBatterylebel(){
+        Log.v("plugged",powervariable[2].toString())
+        Log.v("level",powervariable[3].toString())
     }
+
     @Composable
     fun greeting(name: String) {
         Text(text = "Hello $name!")
@@ -256,3 +265,4 @@ class MainActivity : ComponentActivity(){
         super.onNewIntent(intent)
     }*/
 }
+
