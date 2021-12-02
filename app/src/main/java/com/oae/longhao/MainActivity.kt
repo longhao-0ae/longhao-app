@@ -39,10 +39,26 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver
 
 import android.hardware.usb.UsbManager
 import java.io.IOException
+import com.hoho.android.usbserial.driver.UsbSerialPort
+
+import android.hardware.usb.UsbDeviceConnection
+import com.hoho.android.usbserial.util.SerialInputOutputManager
+import java.util.concurrent.Executors
+import java.lang.Exception
 
 
 private lateinit var locationCallback: LocationCallback
+var usbIoManager: SerialInputOutputManager? = null
 
+private val mListener: SerialInputOutputManager.Listener =
+    object : SerialInputOutputManager.Listener {
+        override fun onRunError(e: Exception) {
+            if (e.message != null) Log.v("通信エラーが発生しました", e.message.toString())
+        }
+        override fun onNewData(data: ByteArray) {
+            Log.v("recived data",data.toString())
+        }
+    }
 class MainActivity : ComponentActivity(){
     private lateinit var fusedLocationClient : FusedLocationProviderClient
     // level = 1,plugged = 2
@@ -71,8 +87,20 @@ class MainActivity : ComponentActivity(){
             Log.v("connection failed","not enough ports at device")
             return
         }
-        //availableDriversの取得はできた　こっからどーすんだろ
+        val connection = manager.openDevice(driver.device)
+            ?:
+            // USBデバイスへのアクセス権限がなかった時の処理
+            // 恐らくBroadcast Receiverの仕組みを使うと思います
+            return
 
+        val port = driver.ports[0]
+        port.open(connection)
+        port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+
+        usbIoManager = SerialInputOutputManager(port, mListener)
+        Executors.newSingleThreadExecutor().submit(usbIoManager)
+
+        // //--取り消し--driversの取得はできた　こっからどーすんだろ
         /*
         usb = UsbSerialProber.acquire(manager)
         if (usb != null) {
