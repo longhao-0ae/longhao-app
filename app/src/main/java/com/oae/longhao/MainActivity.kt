@@ -28,6 +28,9 @@ import com.google.android.gms.location.*
 import java.util.*
 import kotlin.concurrent.schedule
 import android.os.Build
+import android.telephony.PhoneStateListener
+import android.telephony.SignalStrength
+import android.telephony.TelephonyManager
 import android.view.WindowInsetsController
 
 
@@ -46,19 +49,24 @@ class MainActivity : ComponentActivity(){
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         //ナビゲーションバーとステータスバー隠す
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            window.decorView.systemUiVisibility =
-                (View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
             window.decorView.windowInsetsController?.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
             window.decorView.windowInsetsController?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        } else {
+             window.decorView.systemUiVisibility =
+                 (View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
+         }
 
-        var mylist: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
+        val myList: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
         //バッテリ
         val intentfilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(BatteryReceiver, intentfilter)
+
+        val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        tm.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS)
+
+
 
         //位置情報の権限チェック
         if (ActivityCompat.checkSelfPermission(
@@ -108,8 +116,8 @@ class MainActivity : ComponentActivity(){
 
 
         Timer().schedule(0, 5000) {
-            GetBatterylebel()
-            GetLocation()
+            getBatteryLevel()
+            getLocation()
             //   this.cancel()
         }
 
@@ -168,9 +176,9 @@ class MainActivity : ComponentActivity(){
                 // A surface container using the 'background' color from the theme
                 Surface(color = MaterialTheme.colors.background) {
                     Column {
-                    greeting("Android")
-                   buttontest()
-                        MessageList(serialList = mylist)
+                    Greeting("Android")
+                   TestButton()
+                        MessageList(serialList = myList)
                     }
                 }
             }
@@ -181,6 +189,15 @@ class MainActivity : ComponentActivity(){
         Log.v("TerminalFragment", "onNewData")
     }*/
 
+    private val phoneStateListener = object : PhoneStateListener() {
+        override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
+            super.onSignalStrengthsChanged(signalStrength)
+            val level = signalStrength?.level
+            //んー simささないと動いてるかわからん
+            Log.v("Strengthlevel",level.toString())
+        }
+    }
+
     private val BatteryReceiver: BroadcastReceiver = object: BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val bm = applicationContext.getSystemService(BATTERY_SERVICE) as BatteryManager
@@ -190,22 +207,22 @@ class MainActivity : ComponentActivity(){
             powerVariable[2] = batteryPlugged
         }
     }
-    private fun GetLocation(){
+    private fun getLocation(){
         Log.v("gps-latitude",locationVariable[1].toString())
     }
 
-    private fun GetBatterylebel(){
+    private fun getBatteryLevel(){
         Log.v("plugged",powerVariable[2].toString())
         Log.v("level",powerVariable[1].toString())
     }
 
     @Composable
-    fun greeting(name: String) {
+    fun Greeting(name: String) {
         Text(text = "Hello $name!")
     }
 
     @Composable
-    fun buttontest() {
+    fun TestButton() {
         Button(
             onClick = { /* ... */ },
         ){
