@@ -20,6 +20,7 @@ import android.content.Intent
 
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbDevice
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
@@ -32,6 +33,12 @@ import android.telephony.PhoneStateListener
 import android.telephony.SignalStrength
 import android.telephony.TelephonyManager
 import android.view.WindowInsetsController
+import com.hoho.android.usbserial.driver.UsbSerialProber
+
+import com.hoho.android.usbserial.driver.UsbSerialDriver
+
+import android.hardware.usb.UsbManager
+import java.io.IOException
 
 
 private lateinit var locationCallback: LocationCallback
@@ -39,12 +46,45 @@ private lateinit var locationCallback: LocationCallback
 class MainActivity : ComponentActivity(){
     private lateinit var fusedLocationClient : FusedLocationProviderClient
     // level = 1,plugged = 2
+    //ん　更新されないことがある（時間経った時？）や　そもそもなんか認識してないとか変更できてないとかかも
     val powerVariable = mutableMapOf(1 to 9999, 2 to Boolean)
     // latitude = 1,longitude = 2,altitude = 3
     val locationVariable = mutableMapOf(1 to 0.0,2 to 0.0,3 to 0.0)
+    //
+  //  lateinit var usb: UsbSerialDriver
+//   var device: UsbDevice? = null
+
     //,FragmentManager.OnBackStackChangedListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        //serial
+        val manager = getSystemService(USB_SERVICE) as UsbManager
+        val availableDrivers: List<UsbSerialDriver> = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
+        if (availableDrivers.isEmpty()) {
+            return
+        }
+        val driver = availableDrivers[0]
+        if (driver == null) {
+            Log.v("connection failed", "no driver for device")
+            return
+        } else if (driver.getPorts().size < 0) {
+            Log.v("connection failed","not enough ports at device")
+            return
+        }
+        //availableDriversの取得はできた　こっからどーすんだろ
+
+        /*
+        usb = UsbSerialProber.acquire(manager)
+        if (usb != null) {
+            try {
+                usb.open()
+                usb.setBaudRate(9600)
+                start_read_thread() // シリアル通信を読むスレッドを起動
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }*/
+
         //画面常時オン
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -189,6 +229,7 @@ class MainActivity : ComponentActivity(){
         Log.v("TerminalFragment", "onNewData")
     }*/
 
+
     private val phoneStateListener = object : PhoneStateListener() {
         override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
             super.onSignalStrengthsChanged(signalStrength)
@@ -245,11 +286,6 @@ class MainActivity : ComponentActivity(){
 /*
     fun onBackStackChanged() {
         supportActionBar!!.setDisplayHomeAsUpEnabled(supportFragmentManager.backStackEntryCount > 0)
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        onBackPressed()
-        return true
     }
 
     override fun onNewIntent(intent: Intent) {
