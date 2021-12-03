@@ -53,10 +53,11 @@ var usbIoManager: SerialInputOutputManager? = null
 private val mListener: SerialInputOutputManager.Listener =
     object : SerialInputOutputManager.Listener {
         override fun onRunError(e: Exception) {
-            if (e.message != null) Log.v("通信エラーが発生しました", e.message.toString())
+            if (e.message != null) Log.v("シリアルエラー", e.message.toString())
         }
         override fun onNewData(data: ByteArray) {
-            Log.v("recived data",data.toString())
+            //途切れるのはしゃーないらしい　こっちで貯めてくっつけなきゃないぽい
+            Log.v("received data",String(data,Charsets.UTF_8))
         }
     }
 
@@ -72,7 +73,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        //serial
+
+        //シリアル
         val manager = getSystemService(USB_SERVICE) as UsbManager
         val availableDrivers: List<UsbSerialDriver> =
             UsbSerialProber.getDefaultProber().findAllDrivers(manager)
@@ -90,17 +92,14 @@ class MainActivity : ComponentActivity() {
         val connection = manager.openDevice(driver.device)
             ?:
             // USBデバイスへのアクセス権限がなかった時の処理
-            // 恐らくBroadcast Receiverの仕組みを使うと思います
+            // 恐らくBroadcast Receiverを使う
             return
 
         val port = driver.ports[0]
         port.open(connection)
         port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-
         usbIoManager = SerialInputOutputManager(port, mListener)
         Executors.newSingleThreadExecutor().submit(usbIoManager)
-
-        // 受信はできてるけどぶっ壊れてる　何があってないんだろ
 
         //画面常時オン
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
