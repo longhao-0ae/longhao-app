@@ -20,7 +20,6 @@ import android.content.Intent
 
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.hardware.usb.UsbDevice
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
@@ -38,14 +37,15 @@ import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 
 import android.hardware.usb.UsbManager
-import java.io.IOException
 import com.hoho.android.usbserial.driver.UsbSerialPort
 
-import android.hardware.usb.UsbDeviceConnection
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import java.util.concurrent.Executors
 import java.lang.Exception
 
+import com.github.kittinunf.fuel.httpGet
+import com.github.kittinunf.fuel.json.responseJson
+import com.github.kittinunf.result.Result
 
 private lateinit var locationCallback: LocationCallback
 var usbIoManager: SerialInputOutputManager? = null
@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
         val port = driver.ports[0]
         port.open(connection)
         port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+        port.write("Start".toByteArray(Charsets.UTF_8),2000)
         usbIoManager = SerialInputOutputManager(port, mListener)
         Executors.newSingleThreadExecutor().submit(usbIoManager)
 
@@ -117,11 +118,12 @@ class MainActivity : ComponentActivity() {
         val myList: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
         //バッテリ
-        val intentfilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        registerReceiver(BatteryReceiver, intentfilter)
+        val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        registerReceiver(BatteryReceiver, intentFilter)
 
         val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         tm.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS)
+        //メモ writeAsyncみたいなので送信できたはず
 
 
         //位置情報の権限チェック
@@ -178,6 +180,7 @@ class MainActivity : ComponentActivity() {
         Timer().schedule(0, 5000) {
             getBatteryLevel()
             getLocation()
+            getServer()
             //   this.cancel()
         }
 
@@ -195,13 +198,29 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    private fun getServer() {
+        // 非同期処理
+        "http://192.168.3.16/api/motor_rpm".httpGet().responseJson{ _, _, result ->
+            when (result) {
+                is Result.Success -> {
+                    val json = result.value.obj()
+                    val value = json.get("value")
+                    Log.d("getServer", value.toString())
+                    usbIoManager?.writeAsync(value.toString().toByteArray(Charsets.UTF_8))
+                }
+                is Result.Failure -> {
+                    Log.v("getServer","Err")
+                }
+            }
+        }
+    }
 
     private val phoneStateListener = object : PhoneStateListener() {
         override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
             super.onSignalStrengthsChanged(signalStrength)
             val level = signalStrength?.level
             //んー simささないと動いてるかわからん
-            Log.v("Strengthlevel", level.toString())
+            Log.v("StrengthLevel", level.toString())
         }
     }
 
