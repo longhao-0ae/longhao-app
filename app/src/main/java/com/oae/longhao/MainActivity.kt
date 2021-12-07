@@ -37,6 +37,9 @@ import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 
 import android.hardware.usb.UsbManager
+import com.github.kittinunf.fuel.Fuel
+import com.github.kittinunf.fuel.core.Headers
+import com.github.kittinunf.fuel.core.extensions.jsonBody
 import com.hoho.android.usbserial.driver.UsbSerialPort
 
 import com.hoho.android.usbserial.util.SerialInputOutputManager
@@ -44,8 +47,10 @@ import java.util.concurrent.Executors
 import java.lang.Exception
 
 import com.github.kittinunf.fuel.httpGet
+import com.github.kittinunf.fuel.httpPost
 import com.github.kittinunf.fuel.json.responseJson
 import com.github.kittinunf.result.Result
+import java.time.LocalDateTime
 
 private lateinit var locationCallback: LocationCallback
 var usbIoManager: SerialInputOutputManager? = null
@@ -79,20 +84,20 @@ class MainActivity : ComponentActivity() {
         val availableDrivers: List<UsbSerialDriver> =
             UsbSerialProber.getDefaultProber().findAllDrivers(manager)
         if (availableDrivers.isEmpty()) {
+            Log.v("USB","driver not found")
             return
         }
         val driver = availableDrivers[0]
         if (driver == null) {
             Log.v("connection failed", "no driver for device")
             return
-        } else if (driver.getPorts().size < 0) {
+        } else if (driver.ports.size < 0) {
             Log.v("connection failed", "not enough ports at device")
             return
         }
         val connection = manager.openDevice(driver.device)
             ?:
             // USBデバイスへのアクセス権限がなかった時の処理
-            // 恐らくBroadcast Receiverを使う
             return
 
         val port = driver.ports[0]
@@ -239,8 +244,40 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun getBatteryLevel() {
+        val zonedDateTime = LocalDateTime.now().toString()
         Log.v("plugged", powerVariable[2].toString())
-        Log.v("level", powerVariable[1].toString())
+        //zonedDateTimeに問題あり
+        val bodyJson = """
+            {
+                "boat":{
+                    "level":"${"0"}",
+                    "charging":"${"false"}",
+                    "last_time":"${zonedDateTime}"
+                 },
+                "phone":{
+                    "level": ${powerVariable[1].toString()},
+                    "charging":${powerVariable[2].toString()},
+                    "last_time":"${zonedDateTime}"
+                    }
+            }
+            """.trimIndent().replace(System.lineSeparator(), "").replace(" ", "")
+        Log.v("datajson",bodyJson)
+
+        //bodyjsonに問題がある
+        Fuel.post("http://192.168.3.16/api/battery")
+            .jsonBody(bodyJson)
+            .response { result -> }
+        /*responseJson{ _, _, result ->
+            when (result) {
+                is Result.Success -> {
+                    val json = result.value.obj()
+                    Log.d("getBatteryLevel", json.toString())
+                }
+                is Result.Failure -> {
+                    Log.v("getBatteryLevel","Err" + result.error)
+                }
+            }
+        }*/
     }
 
     @Composable
