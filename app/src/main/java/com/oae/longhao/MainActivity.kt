@@ -38,7 +38,6 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver
 
 import android.hardware.usb.UsbManager
 import com.github.kittinunf.fuel.Fuel
-import com.github.kittinunf.fuel.core.Headers
 import com.github.kittinunf.fuel.core.extensions.jsonBody
 import com.hoho.android.usbserial.driver.UsbSerialPort
 
@@ -47,7 +46,6 @@ import java.util.concurrent.Executors
 import java.lang.Exception
 
 import com.github.kittinunf.fuel.httpGet
-import com.github.kittinunf.fuel.httpPost
 import com.github.kittinunf.fuel.json.responseJson
 import com.github.kittinunf.result.Result
 import java.time.LocalDateTime
@@ -183,9 +181,10 @@ class MainActivity : ComponentActivity() {
 
 
         Timer().schedule(0, 5000) {
-            getBatteryLevel()
-            getLocation()
-            getServer()
+            val zonedDateTimeString = LocalDateTime.now().toString()
+            sendBattery(zonedDateTimeString)
+            sendLocation(zonedDateTimeString)
+            getMotorRPM()
             //   this.cancel()
         }
 
@@ -203,14 +202,14 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    private fun getServer() {
+    private fun getMotorRPM() {
         // 非同期処理
         "http://192.168.3.16/api/motor_rpm".httpGet().responseJson{ _, _, result ->
             when (result) {
                 is Result.Success -> {
                     val json = result.value.obj()
                     val value = json.get("value")
-                    Log.d("getServer", value.toString())
+                    Log.e("getServer", value.toString())
                     usbIoManager?.writeAsync(value.toString().toByteArray(Charsets.UTF_8))
                 }
                 is Result.Failure -> {
@@ -239,46 +238,52 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun getLocation() {
-        Log.v("gps-latitude", locationVariable[1].toString())
+    private fun postData(RawBodyJson: String, ApiPoint: String){
+        val bodyJson = RawBodyJson.trimIndent().replace(System.lineSeparator(), "").replace(" ", "")
+        val url = "http://192.168.3.16${ApiPoint}"
+        Fuel.post(url)
+            .jsonBody(bodyJson)
+            .responseJson { _, _, result ->
+                when (result) {
+                    is Result.Success -> {
+                        val json = result.value.obj()
+                        val status = json.get("status")
+                        Log.i(url, status.toString())
+                    }
+                    is Result.Failure -> {
+                        Log.e(url, "Err" + result.error)
+                    }
+                }
+            }
     }
-
-    private fun getBatteryLevel() {
-        val zonedDateTime = LocalDateTime.now().toString()
+    private fun sendLocation(zonedDateTimeString: String) {
+        val bodyJson = """
+            {
+                "location":[${locationVariable[2].toString()},${locationVariable[1].toString()}],
+                "last_time":"${zonedDateTimeString}"
+            }
+        """
+        postData(bodyJson,"/api/location")
+    }
+    private fun sendBattery(zonedDateTimeString: String) {
         Log.v("plugged", powerVariable[2].toString())
         //zonedDateTimeに問題あり
         val bodyJson = """
             {
                 "boat":{
-                    "level":"${"0"}",
-                    "charging":"${"false"}",
-                    "last_time":"${zonedDateTime}"
+                    "level":${"0"},
+                    "charging":${false},
+                    "last_time":"${zonedDateTimeString}"
                  },
                 "phone":{
                     "level": ${powerVariable[1].toString()},
                     "charging":${powerVariable[2].toString()},
-                    "last_time":"${zonedDateTime}"
+                    "last_time":"${zonedDateTimeString}"
                     }
             }
-            """.trimIndent().replace(System.lineSeparator(), "").replace(" ", "")
-        Log.v("datajson",bodyJson)
-
-        //bodyjsonに問題がある
-        Fuel.post("http://192.168.3.16/api/battery")
-            .jsonBody(bodyJson)
-            .response { result -> }
-        /*responseJson{ _, _, result ->
-            when (result) {
-                is Result.Success -> {
-                    val json = result.value.obj()
-                    Log.d("getBatteryLevel", json.toString())
-                }
-                is Result.Failure -> {
-                    Log.v("getBatteryLevel","Err" + result.error)
-                }
-            }
-        }*/
-    }
+            """
+        postData(bodyJson,"/api/battery")
+        }
 
     @Composable
     fun Greeting(name: String) {
