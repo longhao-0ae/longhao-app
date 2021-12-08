@@ -108,6 +108,8 @@ class MainActivity : ComponentActivity() {
         //画面常時オン
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        Location().test()
+
         //ナビゲーションバーとステータスバー隠す
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.decorView.windowInsetsController?.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
@@ -127,7 +129,6 @@ class MainActivity : ComponentActivity() {
         val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         tm.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS)
         //メモ writeAsyncみたいなので送信できたはず
-
 
         //位置情報の権限チェック
         if (ActivityCompat.checkSelfPermission(
@@ -179,16 +180,17 @@ class MainActivity : ComponentActivity() {
             Looper.myLooper()
         )
 
-
         Timer().schedule(0, 5000) {
             val zonedDateTimeString = LocalDateTime.now().toString()
             sendBattery(zonedDateTimeString)
             sendLocation(zonedDateTimeString)
+            //   this.cancel()
+        }
+        //短くするとなんかピッピって鳴る でもあとで短くしなきゃ
+        Timer().schedule(0, 10000) {
             getMotorRPM()
             //   this.cancel()
         }
-
-
         setContent {
             LonghaoTheme {
                 // A surface container using the 'background' color from the theme
@@ -198,22 +200,6 @@ class MainActivity : ComponentActivity() {
                         TestButton()
                         MessageList(serialList = myList)
                     }
-                }
-            }
-        }
-    }
-    private fun getMotorRPM() {
-        // 非同期処理
-        "http://192.168.3.16/api/motor_rpm".httpGet().responseJson{ _, _, result ->
-            when (result) {
-                is Result.Success -> {
-                    val json = result.value.obj()
-                    val value = json.get("value")
-                    Log.e("getServer", value.toString())
-                    usbIoManager?.writeAsync(value.toString().toByteArray(Charsets.UTF_8))
-                }
-                is Result.Failure -> {
-                    Log.v("getServer","Err")
                 }
             }
         }
@@ -243,7 +229,7 @@ class MainActivity : ComponentActivity() {
         val url = "http://192.168.3.16${ApiPoint}"
         Fuel.post(url)
             .jsonBody(bodyJson)
-            .responseJson { _, _, result ->
+            .responseJson { request, response, result ->
                 when (result) {
                     is Result.Success -> {
                         val json = result.value.obj()
@@ -251,7 +237,23 @@ class MainActivity : ComponentActivity() {
                         Log.i(url, status.toString())
                     }
                     is Result.Failure -> {
-                        Log.e(url, "Err" + result.error)
+                        when (response.statusCode) {
+                            -1 -> {
+                                Log.e(url,"Err: Unknown Error(Network?)")
+                            }
+                            500 -> {
+                                Log.e(url,"Err: ServerError")
+                            }
+                            401 -> {
+                                Log.e(url,"Err: Unauthorized")
+                            }
+                            404 -> {
+                                Log.e(url,"Err: Not found")
+                            }
+                            else -> {
+                                Log.e(url, "Err: " + result.error.message)
+                            }
+                        }
                     }
                 }
             }
@@ -284,6 +286,23 @@ class MainActivity : ComponentActivity() {
             """
         postData(bodyJson,"/api/battery")
         }
+    private fun getMotorRPM() {
+        // 非同期処理
+        "http://192.168.3.16/api/motor_rpm".httpGet().responseJson{ _, _, result ->
+            when (result) {
+                is Result.Success -> {
+                    val json = result.value.obj()
+                    val value = json.get("value")
+                    Log.e("getServer", value.toString())
+                    usbIoManager?.writeAsync(value.toString().toByteArray(Charsets.UTF_8))
+                }
+                is Result.Failure -> {
+                    Log.e("getServer","Err")
+                    usbIoManager?.writeAsync("1000".toByteArray(Charsets.UTF_8))
+                }
+            }
+        }
+    }
 
     @Composable
     fun Greeting(name: String) {
