@@ -1,7 +1,6 @@
 package com.oae.longhao
 
 import android.Manifest
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -14,24 +13,19 @@ import androidx.compose.material.*
 
 import android.util.Log
 import androidx.activity.compose.setContent
-import android.os.BatteryManager
 
 import android.content.Intent
 
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Looper
-import android.view.View
-import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
 import java.util.*
 import kotlin.concurrent.schedule
-import android.os.Build
 import android.telephony.PhoneStateListener
 import android.telephony.SignalStrength
 import android.telephony.TelephonyManager
-import android.view.WindowInsetsController
 import com.hoho.android.usbserial.driver.UsbSerialProber
 
 import com.hoho.android.usbserial.driver.UsbSerialDriver
@@ -86,10 +80,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val driver = availableDrivers[0]
-        if (driver == null) {
-            Log.v("connection failed", "no driver for device")
-            return
-        } else if (driver.ports.size < 0) {
+        if (driver.ports.size < 0) {
             Log.v("connection failed", "not enough ports at device")
             return
         }
@@ -104,28 +95,15 @@ class MainActivity : ComponentActivity() {
         port.write("Start".toByteArray(Charsets.UTF_8),2000)
         usbIoManager = SerialInputOutputManager(port, mListener)
         Executors.newSingleThreadExecutor().submit(usbIoManager)
-
-        //画面常時オン
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
+        appSettings(window)
         Location().test()
-
-        //ナビゲーションバーとステータスバー隠す
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.decorView.windowInsetsController?.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-            window.decorView.windowInsetsController?.systemBarsBehavior =
-                WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        } else {
-            window.decorView.systemUiVisibility =
-                (View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
-        }
-
         val myList: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
         //バッテリ
         val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        registerReceiver(BatteryReceiver, intentFilter)
+        registerReceiver(PhoneBatteryReceiver(), intentFilter)
 
+        //電波強度?
         val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         tm.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS)
         //メモ writeAsyncみたいなので送信できたはず
@@ -193,7 +171,6 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             LonghaoTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(color = MaterialTheme.colors.background) {
                     Column {
                         Greeting("Android")
@@ -203,70 +180,19 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
     }
 
-    private val phoneStateListener = object : PhoneStateListener() {
-        override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
-            super.onSignalStrengthsChanged(signalStrength)
-            val level = signalStrength?.level
-            //んー simささないと動いてるかわからん
-            Log.v("StrengthLevel", level.toString())
-        }
-    }
-
-    private val BatteryReceiver: BroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val bm = applicationContext.getSystemService(BATTERY_SERVICE) as BatteryManager
-            val batLevel: Int = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-            val batteryPlugged = bm.isCharging
-            powerVariable[1] = batLevel
-            powerVariable[2] = batteryPlugged
-        }
-    }
-
-    private fun postData(RawBodyJson: String, ApiPoint: String){
-        val bodyJson = RawBodyJson.trimIndent().replace(System.lineSeparator(), "").replace(" ", "")
-        val url = "http://192.168.3.16${ApiPoint}"
-        Fuel.post(url)
-            .jsonBody(bodyJson)
-            .responseJson { request, response, result ->
-                when (result) {
-                    is Result.Success -> {
-                        val json = result.value.obj()
-                        val status = json.get("status")
-                        Log.i(url, status.toString())
-                    }
-                    is Result.Failure -> {
-                        when (response.statusCode) {
-                            -1 -> {
-                                Log.e(url,"Err: Unknown Error(Network?)")
-                            }
-                            500 -> {
-                                Log.e(url,"Err: ServerError")
-                            }
-                            401 -> {
-                                Log.e(url,"Err: Unauthorized")
-                            }
-                            404 -> {
-                                Log.e(url,"Err: Not found")
-                            }
-                            else -> {
-                                Log.e(url, "Err: " + result.error.message)
-                            }
-                        }
-                    }
-                }
-            }
-    }
     private fun sendLocation(zonedDateTimeString: String) {
         val bodyJson = """
             {
                 "location":[${locationVariable[2].toString()},${locationVariable[1].toString()}],
-                "last_time":"${zonedDateTimeString}"
+                "last_time":"$zonedDateTimeString"
             }
         """
         postData(bodyJson,"/api/location")
     }
+
     private fun sendBattery(zonedDateTimeString: String) {
         Log.v("plugged", powerVariable[2].toString())
         //zonedDateTimeに問題あり
@@ -275,17 +201,18 @@ class MainActivity : ComponentActivity() {
                 "boat":{
                     "level":${"0"},
                     "charging":${false},
-                    "last_time":"${zonedDateTimeString}"
+                    "last_time":"$zonedDateTimeString"
                  },
                 "phone":{
                     "level": ${powerVariable[1].toString()},
                     "charging":${powerVariable[2].toString()},
-                    "last_time":"${zonedDateTimeString}"
+                    "last_time":"$zonedDateTimeString"
                     }
             }
             """
         postData(bodyJson,"/api/battery")
         }
+
     private fun getMotorRPM() {
         // 非同期処理
         "http://192.168.3.16/api/motor_rpm".httpGet().responseJson{ _, _, result ->
@@ -293,7 +220,7 @@ class MainActivity : ComponentActivity() {
                 is Result.Success -> {
                     val json = result.value.obj()
                     val value = json.get("value")
-                    Log.e("getServer", value.toString())
+                    Log.i("getServer", value.toString())
                     usbIoManager?.writeAsync(value.toString().toByteArray(Charsets.UTF_8))
                 }
                 is Result.Failure -> {

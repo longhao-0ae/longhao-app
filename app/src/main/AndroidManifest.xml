@@ -25,6 +25,18 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Longhao">
+        <!--自動起動-->
+        <receiver
+            android:name=".StartupReceiver"
+            android:enabled="true"
+            android:exported="false"
+            android:process="">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -32,7 +44,6 @@
             android:screenOrientation="userLandscape"
             android:theme="@style/Theme.Longhao.NoActionBar"
             >
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
