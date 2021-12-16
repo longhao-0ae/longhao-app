@@ -24,20 +24,11 @@ import com.google.android.gms.location.*
 import java.util.*
 import kotlin.concurrent.schedule
 import android.telephony.PhoneStateListener
-import android.telephony.SignalStrength
 import android.telephony.TelephonyManager
-import com.hoho.android.usbserial.driver.UsbSerialProber
-
-import com.hoho.android.usbserial.driver.UsbSerialDriver
 
 import android.hardware.usb.UsbManager
-import com.github.kittinunf.fuel.Fuel
-import com.github.kittinunf.fuel.core.extensions.jsonBody
-import com.hoho.android.usbserial.driver.UsbSerialPort
 
 import com.hoho.android.usbserial.util.SerialInputOutputManager
-import java.util.concurrent.Executors
-import java.lang.Exception
 
 import com.github.kittinunf.fuel.httpGet
 import com.github.kittinunf.fuel.json.responseJson
@@ -46,17 +37,6 @@ import java.time.LocalDateTime
 
 private lateinit var locationCallback: LocationCallback
 var usbIoManager: SerialInputOutputManager? = null
-
-private val mListener: SerialInputOutputManager.Listener =
-    object : SerialInputOutputManager.Listener {
-        override fun onRunError(e: Exception) {
-            if (e.message != null) Log.v("シリアルエラー", e.message.toString())
-        }
-        override fun onNewData(data: ByteArray) {
-            //途切れるのはしゃーないらしい　こっちで貯めてくっつけなきゃないぽい
-            Log.v("received data",String(data,Charsets.UTF_8))
-        }
-    }
 
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -67,37 +47,14 @@ class MainActivity : ComponentActivity() {
 
     // latitude = 1,longitude = 2,altitude = 3
     val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
+    private val myList: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        //シリアル
-        val manager = getSystemService(USB_SERVICE) as UsbManager
-        val availableDrivers: List<UsbSerialDriver> =
-            UsbSerialProber.getDefaultProber().findAllDrivers(manager)
-        if (availableDrivers.isEmpty()) {
-            Log.v("USB","driver not found")
-            return
-        }
-        val driver = availableDrivers[0]
-        if (driver.ports.size < 0) {
-            Log.v("connection failed", "not enough ports at device")
-            return
-        }
-        val connection = manager.openDevice(driver.device)
-            ?:
-            // USBデバイスへのアクセス権限がなかった時の処理
-            return
-
-        val port = driver.ports[0]
-        port.open(connection)
-        port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-        port.write("Start".toByteArray(Charsets.UTF_8),2000)
-        usbIoManager = SerialInputOutputManager(port, mListener)
-        Executors.newSingleThreadExecutor().submit(usbIoManager)
+        setupSerial(getSystemService(USB_SERVICE) as UsbManager)
         appSettings(window)
         Location().test()
-        val myList: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
         //バッテリ
         val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -137,10 +94,7 @@ class MainActivity : ComponentActivity() {
         }
 
         locationCallback = object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult?) {
-                if (locationResult == null) {
-                    return
-                }
+            override fun onLocationResult(locationResult: LocationResult) {
                 for (location in locationResult.locations) {
                     if (location != null) {
                         locationVariable[1] = location.latitude
@@ -152,11 +106,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         /// 位置情報を更新
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            Looper.myLooper()
-        )
+        Looper.myLooper()?.let {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                it
+            )
+        }
 
         Timer().schedule(0, 5000) {
             val zonedDateTimeString = LocalDateTime.now().toString()
