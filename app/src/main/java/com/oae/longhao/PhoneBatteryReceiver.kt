@@ -9,12 +9,13 @@ import android.util.Log
 
 class PhoneBatteryReceiver : BroadcastReceiver() {
     private val TAG = "PhoneBatteryReceiver"
+    val globalVar = globalVariable.getInstance()
     override fun onReceive(context: Context, intent: Intent) {
         val bm = context.getSystemService(BATTERY_SERVICE) as BatteryManager
         val batLevel: Int = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
         val batteryPlugged = bm.isCharging
-        /*powerVariable[1] = batLevel
-        powerVariable[2] = batteryPlugged*/
+        globalVar.powerVariable[1] = batLevel
+        globalVar.powerVariable[2] = batteryPlugged
         Log.v("battery","changed")
         Log.v(TAG,batLevel.toString())
         Log.v(TAG,batteryPlugged.toString())

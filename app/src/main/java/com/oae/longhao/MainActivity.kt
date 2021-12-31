@@ -1,6 +1,7 @@
 package com.oae.longhao
 
 import android.Manifest
+import android.R.attr
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -35,15 +36,15 @@ import com.github.kittinunf.fuel.json.responseJson
 import com.github.kittinunf.result.Result
 import java.time.LocalDateTime
 
+
+
+
 private lateinit var locationCallback: LocationCallback
 var usbIoManager: SerialInputOutputManager? = null
 
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-
-    // level = 1,plugged = 2
-    //ん　更新されないことがある（時間経った時？）や　そもそもなんか認識してないとか変更できてないとかかも
-    val powerVariable = mutableMapOf(1 to 9999, 2 to Boolean)
+    val globalVar = globalVariable.getInstance()
 
     // latitude = 1,longitude = 2,altitude = 3
     val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
@@ -63,8 +64,11 @@ class MainActivity : ComponentActivity() {
         //電波強度?
         val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         tm.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS)
-        //メモ writeAsyncみたいなので送信できたはず
 
+        //sse
+        SseConnection("http://192.168.3.16/operation/stream")
+
+        //メモ writeAsyncみたいなので送信できたはず
         //位置情報の権限チェック
         if (ActivityCompat.checkSelfPermission(
                 this,
@@ -85,7 +89,7 @@ class MainActivity : ComponentActivity() {
         }
 
         fusedLocationClient = FusedLocationProviderClient(this)
-        val locationRequest = LocationRequest().apply {
+        val locationRequest = LocationRequest.create().apply {
             // 精度重視(電力大)と省電力重視(精度低)を両立するため2種類の更新間隔を指定
             // 今回は公式のサンプル通り
             interval = 10000                                   // 最遅の更新間隔(但し不正確)
@@ -146,11 +150,11 @@ class MainActivity : ComponentActivity() {
                 "last_time":"$zonedDateTimeString"
             }
         """
-        postData(bodyJson,"/api/location")
+    //    postData(bodyJson,"/api/location")
     }
 
     private fun sendBattery(zonedDateTimeString: String) {
-        Log.v("plugged", powerVariable[2].toString())
+        Log.v("plugged", globalVar.powerVariable[2].toString())
         //zonedDateTimeに問題あり
         val bodyJson = """
             {
@@ -160,17 +164,16 @@ class MainActivity : ComponentActivity() {
                     "last_time":"$zonedDateTimeString"
                  },
                 "phone":{
-                    "level": ${powerVariable[1].toString()},
-                    "charging":${powerVariable[2].toString()},
+                    "level": ${globalVar.powerVariable[1].toString()},
+                    "charging":${globalVar.powerVariable[2].toString()},
                     "last_time":"$zonedDateTimeString"
                     }
             }
             """
-        postData(bodyJson,"/api/battery")
+             postData(bodyJson,"/api/battery")
         }
 
     private fun getMotorRPM() {
-        // 非同期処理
         "http://192.168.3.16/api/motor_rpm".httpGet().responseJson{ _, _, result ->
             when (result) {
                 is Result.Success -> {

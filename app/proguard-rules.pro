@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+#-dontwarn org.jetbrains.annotations.**
+#-keep class kotlin.Metadata { *; }
+#-keepclassmembers class com.oae.longhao.** { <init>(...); <fields>;}
+#-keep @android.support.annotation.Keep class * {*;}
