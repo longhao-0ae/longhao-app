@@ -12,13 +12,29 @@ import java.lang.Exception
 import java.util.concurrent.Executors
 
 private val mListener: SerialInputOutputManager.Listener = object : SerialInputOutputManager.Listener {
+    var serialMessage:String = "";
     override fun onRunError(e: Exception) {
-        if (e.message != null) Log.v("シリアルエラー", e.message.toString())
-        //壊れないように連結中のデータがあったら破棄するように
+        if (e.message != null){
+
+        }
+        //壊れないように連結中のデータがあったら破棄
+        Log.v("serial", "Error! Message: " + e.message.toString())
+        serialMessage = ""
     }
     override fun onNewData(data: ByteArray) {
         //途切れるのはしゃーないらしい　こっちで貯めてくっつけなきゃないぽい
-        Log.v("received data",String(data,Charsets.UTF_8))
+     //
+        val sb = StringBuilder()
+        sb.append(serialMessage)
+        sb.append(String(data,Charsets.UTF_8))
+        serialMessage = sb.toString()
+        if (sb.toString().endsWith("}\n")){
+            Log.v("recived data",sb.toString())
+            //処理
+            serialMessage = ""
+            Log.v("serial","serialMessage is Cleared!")
+        }
+
     }
 }
 

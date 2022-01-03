@@ -26,8 +26,6 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 
 import android.hardware.usb.UsbManager
-import android.os.Parcel
-import android.os.Parcelable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
@@ -37,7 +35,6 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager
 
 import java.time.LocalDateTime
 import kotlin.math.roundToInt
-import androidx.compose.material.RangeSlider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -45,7 +42,7 @@ import androidx.compose.ui.unit.dp
 var usbIoManager: SerialInputOutputManager? = null
 private lateinit var locationCallback: LocationCallback
 
-class MainActivity() : ComponentActivity() {
+class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
 
@@ -124,13 +121,14 @@ class MainActivity() : ComponentActivity() {
             val zonedDateTimeString = LocalDateTime.now().toString()
             sendBattery(zonedDateTimeString)
             sendLocation(zonedDateTimeString)
+            usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
             //   this.cancel()
         }
         setContent {
             LonghaoTheme {
                 Surface(color = MaterialTheme.colors.background) {
                     Column {
-                        motorSlider()
+                        MotorSlider()
                     }
                 }
             }
@@ -170,7 +168,7 @@ class MainActivity() : ComponentActivity() {
 }
 
     @Composable
-    fun motorSlider() {
+    fun MotorSlider() {
         var sliderPosition by remember { mutableStateOf(1000f) }
         val intPosition = (sliderPosition).roundToInt()
         @Composable
@@ -191,7 +189,7 @@ class MainActivity() : ComponentActivity() {
         Text(text = intPosition.toString())
 
         Row(Modifier.selectableGroup()) {
-            val radioList = mutableListOf<Int>(1000, 1032, 1300, 1500, 2000)
+            val radioList = mutableListOf(1000, 1032, 1300, 1500, 2000)
             radioList.forEach { OkValue: Int ->
                 radioButtonRow(OkValue)
             }
