@@ -1,14 +1,12 @@
 package com.oae.longhao
 
 import android.Manifest
-import android.R.attr
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 
 import com.oae.longhao.ui.theme.LonghaoTheme
 
-import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.*
 
@@ -28,27 +26,31 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 
 import android.hardware.usb.UsbManager
+import android.os.Parcel
+import android.os.Parcelable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.runtime.*
 
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 
-import com.github.kittinunf.fuel.httpGet
-import com.github.kittinunf.fuel.json.responseJson
-import com.github.kittinunf.result.Result
 import java.time.LocalDateTime
+import kotlin.math.roundToInt
+import androidx.compose.material.RangeSlider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 
-
-
-private lateinit var locationCallback: LocationCallback
 var usbIoManager: SerialInputOutputManager? = null
+private lateinit var locationCallback: LocationCallback
 
-class MainActivity : ComponentActivity() {
+class MainActivity() : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
 
     // latitude = 1,longitude = 2,altitude = 3
     val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
-    private val myList: MutableList<String> = mutableListOf("CPU", "Memory", "Mouse")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,18 +126,11 @@ class MainActivity : ComponentActivity() {
             sendLocation(zonedDateTimeString)
             //   this.cancel()
         }
-        //短くするとなんかピッピって鳴る でもあとで短くしなきゃ
-        Timer().schedule(0, 10000) {
-            getMotorRPM()
-            //   this.cancel()
-        }
         setContent {
             LonghaoTheme {
                 Surface(color = MaterialTheme.colors.background) {
                     Column {
-                        Greeting("Android")
-                        TestButton()
-                        MessageList(serialList = myList)
+                        motorSlider()
                     }
                 }
             }
@@ -150,7 +145,7 @@ class MainActivity : ComponentActivity() {
                 "last_time":"$zonedDateTimeString"
             }
         """
-    //    postData(bodyJson,"/api/location")
+        //    postData(bodyJson,"/api/location")
     }
 
     private fun sendBattery(zonedDateTimeString: String) {
@@ -170,51 +165,44 @@ class MainActivity : ComponentActivity() {
                     }
             }
             """
-             postData(bodyJson,"/api/battery")
-        }
-
-    private fun getMotorRPM() {
-        "http://192.168.3.16/api/motor_rpm".httpGet().responseJson{ _, _, result ->
-            when (result) {
-                is Result.Success -> {
-                    val json = result.value.obj()
-                    val value = json.get("value")
-                    Log.i("getServer", value.toString())
-                    usbIoManager?.writeAsync(value.toString().toByteArray(Charsets.UTF_8))
-                }
-                is Result.Failure -> {
-                    Log.e("getServer","Err")
-                    usbIoManager?.writeAsync("1000".toByteArray(Charsets.UTF_8))
-                }
-            }
-        }
-    }
-
-    @Composable
-    fun Greeting(name: String) {
-        Text(text = "Hello $name!")
-    }
-
-    @Composable
-    fun TestButton() {
-        Button(
-            onClick = { /* ... */ },
-        ) {
-            Text("Like")
-        }
-    }
-
-    @Composable
-    fun MessageList(serialList: MutableList<String>) {
-        Column {
-            serialList.forEach { message ->
-                MessageRow(message)
-            }
-        }
-    }
-
-    @Composable
-    fun MessageRow(message: String) {
-        Text(text = message)
+        postData(bodyJson, "/api/battery")
     }
 }
+
+    @Composable
+    fun motorSlider() {
+        var sliderPosition by remember { mutableStateOf(1000f) }
+        val intPosition = (sliderPosition).roundToInt()
+        @Composable
+        fun radioButtonRow(OkValue: Int){
+            RadioButton(
+                selected = sliderPosition == OkValue.toFloat(),
+                onClick = {
+                    sliderPosition = OkValue.toFloat()
+                    usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
+                }
+            )
+            Text(
+                text = OkValue.toString(),
+                modifier = Modifier.padding(start = 5.dp,end = 8.dp)
+            )
+        }
+
+        Text(text = intPosition.toString())
+
+        Row(Modifier.selectableGroup()) {
+            val radioList = mutableListOf<Int>(1000, 1032, 1300, 1500, 2000)
+            radioList.forEach { OkValue: Int ->
+                radioButtonRow(OkValue)
+            }
+        }
+        Slider(
+            value = sliderPosition,
+            onValueChange = {
+                sliderPosition = it.roundToInt().toFloat()
+                usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
+                            },
+            valueRange = 1000f..2000f,
+            //steps = 1
+            )
+    }

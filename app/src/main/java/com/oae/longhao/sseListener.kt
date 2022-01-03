@@ -3,30 +3,21 @@ package com.oae.longhao
 import android.util.Log
 import com.here.oksse.OkSse
 import com.here.oksse.ServerSentEvent
-import com.squareup.moshi.Json
 import okhttp3.Request
 import okhttp3.Response
-import org.json.JSONObject
-import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.JsonClass
-
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 
-
 class SseConnection(url: String) {
     private lateinit var sse: ServerSentEvent
-    private lateinit var request: Request
-    private lateinit var okSse: OkSse
+    private var request: Request = Request.Builder().url(url).build()
+    private var okSse: OkSse = OkSse()
 
     init {
-        request = Request.Builder().url(url).build()
-        okSse = OkSse()
         runSse()
     }
 
-    fun runSse() {
-
+    private fun runSse() {
         sse = okSse.newServerSentEvent(request, object: ServerSentEvent.Listener {
             override fun onOpen(sse: ServerSentEvent?, response: Response?) {
                 Log.d("sse", "Connection Open")
@@ -42,6 +33,13 @@ class SseConnection(url: String) {
                     val parsedMessage = parseJson(message.removePrefix("b\'").removeSuffix("\'"))
                     Log.v("motor",parsedMessage.first.toString())
                     Log.v("helm",parsedMessage.second.toString())
+                    if (parsedMessage.first in 1000..2000){
+                        Log.v("write","ok")
+                        usbIoManager?.writeAsync(parsedMessage.first.toString().toByteArray(Charsets.UTF_8))
+                    } else {
+                        Log.v("wr","over 2000 or min 1000")
+                        usbIoManager?.writeAsync("1000".toByteArray(Charsets.UTF_8))
+                    }
                 }
             }
 
@@ -73,16 +71,16 @@ class SseConnection(url: String) {
         )
     }
 
-    data class umm (
+    data class Umm (
         val motor:Int,
         val helm:Int
     )
 
     fun parseJson(json: String):Pair<Int,Int> {
-        var moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
-        var parser = moshi.adapter(umm::class.java)
+        val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+        val parser = moshi.adapter(Umm::class.java)
         return try {
-            val parsedJson: umm? = parser.fromJson(json)
+            val parsedJson: Umm? = parser.fromJson(json)
             if (parsedJson != null) {
                 Pair(parsedJson.motor,parsedJson.helm)
             } else {
@@ -92,7 +90,6 @@ class SseConnection(url: String) {
             Log.e("json parse error", e.toString())
             Pair(88888,88888)
         }
-        return Pair(88888,88888)
     }
 
 

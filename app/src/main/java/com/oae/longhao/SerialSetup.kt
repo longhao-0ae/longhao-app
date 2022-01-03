@@ -31,7 +31,7 @@ fun setupSerial(manager: UsbManager){
     }
     val driver = availableDrivers[0]
     if (driver.ports.size < 0) {
-        Log.v("connection failed", "not enough ports at device")
+        Log.v("USB", "connection failed,reason -> not enough ports at device")
         return
     }
     val connection = manager.openDevice(driver.device)
@@ -43,6 +43,7 @@ fun setupSerial(manager: UsbManager){
     port.open(connection)
     port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
     port.write("Start".toByteArray(Charsets.UTF_8),2000)
+    Log.v("USB","connection success!")
     usbIoManager = SerialInputOutputManager(port, mListener)
     Executors.newSingleThreadExecutor().submit(usbIoManager)
 }
