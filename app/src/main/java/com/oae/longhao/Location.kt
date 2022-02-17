@@ -5,7 +5,7 @@ import android.util.Log
 class Location {
  //   Log.v("res","かな?")
     fun test(){
-        Log.v("test","OKay!")
+        Log.v("Locationfunc-test","OKay!")
         return;
     }
 }

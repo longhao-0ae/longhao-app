@@ -26,6 +26,8 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 
 import android.hardware.usb.UsbManager
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
@@ -45,6 +47,7 @@ private lateinit var locationCallback: LocationCallback
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
+    private lateinit var sseConnection: SseConnection
 
     // latitude = 1,longitude = 2,altitude = 3
     val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
@@ -68,24 +71,7 @@ class MainActivity : ComponentActivity() {
         SseConnection("http://192.168.3.16/operation/stream")
 
         //メモ writeAsyncみたいなので送信できたはず
-        //位置情報の権限チェック
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return
-        }
+        checkLocationPermission()
 
         fusedLocationClient = FusedLocationProviderClient(this)
         val locationRequest = LocationRequest.create().apply {
@@ -95,7 +81,6 @@ class MainActivity : ComponentActivity() {
             fastestInterval = 5000                             // 最短の更新間隔
             priority = LocationRequest.PRIORITY_HIGH_ACCURACY  // 精度重視
         }
-
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 for (location in locationResult.locations) {
@@ -117,6 +102,7 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+
         Timer().schedule(0, 5000) {
             val zonedDateTimeString = LocalDateTime.now().toString()
             sendBattery(zonedDateTimeString)
@@ -128,12 +114,20 @@ class MainActivity : ComponentActivity() {
             LonghaoTheme {
                 Surface(color = MaterialTheme.colors.background) {
                     Column {
+                        Text("yay")
                         MotorSlider()
                     }
                 }
             }
         }
 
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        usbIoManager?.stop()
+        sseConnection.closeSse()
+        Log.i("info","Destroy")
     }
 
     private fun sendLocation(zonedDateTimeString: String) {
@@ -143,7 +137,35 @@ class MainActivity : ComponentActivity() {
                 "last_time":"$zonedDateTimeString"
             }
         """
-        //    postData(bodyJson,"/api/location")
+        Log.v("sendlocation","test")
+            postData(bodyJson,"/api/location")
+    }
+
+    private fun checkLocationPermission(){
+        //メモ 位置情報の権限ないと画面真っ白になる
+
+        if  (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+            ||
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+        ) {
+
+            if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)
+            ) {
+                //説明UIを表示（ほんとは）
+                Toast.makeText(this, "位置情報の権限が必要です", Toast.LENGTH_LONG).show()
+            }
+            val requestPermission =
+                registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grantStates: Map<String,Boolean> ->
+                    for ((permission, granted) in grantStates) {
+                        Toast.makeText(this,"$permission - $granted",Toast.LENGTH_SHORT).show()
+                    }
+                }
+            requestPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
+        } else {
+            Toast.makeText(this,"位置情報の権限は許可されています", Toast.LENGTH_LONG).show()
+            return
+        }
     }
 
     private fun sendBattery(zonedDateTimeString: String) {
@@ -166,9 +188,8 @@ class MainActivity : ComponentActivity() {
         postData(bodyJson, "/api/battery")
     }
 }
-
-    @Composable
-    fun MotorSlider() {
+@Composable
+fun MotorSlider() {
         var sliderPosition by remember { mutableStateOf(1000f) }
         val intPosition = (sliderPosition).roundToInt()
         @Composable
@@ -198,7 +219,10 @@ class MainActivity : ComponentActivity() {
             value = sliderPosition,
             onValueChange = {
                 sliderPosition = it.roundToInt().toFloat()
-                usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
+                Log.v("sliderradio","changed")
+                //usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
+                usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
+                Log.v("test", usbIoManager?.state.toString())
                             },
             valueRange = 1000f..2000f,
             //steps = 1

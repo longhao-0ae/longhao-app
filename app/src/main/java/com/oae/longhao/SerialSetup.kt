@@ -13,6 +13,7 @@ import java.util.concurrent.Executors
 
 private val mListener: SerialInputOutputManager.Listener = object : SerialInputOutputManager.Listener {
     var serialMessage:String = "";
+
     override fun onRunError(e: Exception) {
         if (e.message != null){
 
@@ -21,15 +22,14 @@ private val mListener: SerialInputOutputManager.Listener = object : SerialInputO
         Log.v("serial", "Error! Message: " + e.message.toString())
         serialMessage = ""
     }
+
     override fun onNewData(data: ByteArray) {
-        //途切れるのはしゃーないらしい　こっちで貯めてくっつけなきゃないぽい
-     //
         val sb = StringBuilder()
         sb.append(serialMessage)
         sb.append(String(data,Charsets.UTF_8))
         serialMessage = sb.toString()
         if (sb.toString().endsWith("}\n")){
-            Log.v("recived data",sb.toString())
+            Log.v("received data",sb.toString())
             //処理
             serialMessage = ""
             Log.v("serial","serialMessage is Cleared!")

@@ -64,7 +64,7 @@ class SseConnection(url: String) {
                 Log.d("sse", "Connection Closed")
             }
             override fun onPreRetry(sse: ServerSentEvent?, originalRequest: Request): Request {
-                Log.i("TAG", "onPreRetry")
+                Log.i("sse", "onPreRetry")
                 return originalRequest
             }
         }
@@ -91,6 +91,7 @@ class SseConnection(url: String) {
             Pair(88888,88888)
         }
     }
-
-
+    public fun closeSse(){
+        sse.close()
+    }
 }
