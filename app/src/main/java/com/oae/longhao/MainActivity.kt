@@ -2,43 +2,42 @@ package com.oae.longhao
 
 import android.Manifest
 import android.content.Context
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-
-import com.oae.longhao.ui.theme.LonghaoTheme
-
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material.*
-
-import android.util.Log
-import androidx.activity.compose.setContent
-
 import android.content.Intent
-
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbManager
+import android.os.Bundle
 import android.os.Looper
-import androidx.core.app.ActivityCompat
-import com.google.android.gms.location.*
-import java.util.*
-import kotlin.concurrent.schedule
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
-
-import android.hardware.usb.UsbManager
+import android.util.Log
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.runtime.*
-
-import com.hoho.android.usbserial.util.SerialInputOutputManager
-
-import java.time.LocalDateTime
-import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.navigation.*
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.google.android.gms.location.*
+import com.hoho.android.usbserial.util.SerialInputOutputManager
+import com.oae.longhao.ui.theme.LonghaoTheme
+import java.time.LocalDateTime
+import java.util.*
+import kotlin.concurrent.schedule
+import kotlin.math.roundToInt
 
 
 var usbIoManager: SerialInputOutputManager? = null
@@ -54,7 +53,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setupSerial(getSystemService(USB_SERVICE) as UsbManager)
         appSettings(window)
         Location().test()
@@ -68,10 +66,15 @@ class MainActivity : ComponentActivity() {
         tm.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS)
 
         //sse
-        SseConnection("http://192.168.3.16/operation/stream")
+        //有効にするの忘れないで
+        //SseConnection("http://192.168.3.16/operation/stream")
 
         //メモ writeAsyncみたいなので送信できたはず
-        checkLocationPermission()
+
+        /*
+        if(checkLocationPermission().not()){
+            getLocationPermission()
+        }*/
 
         fusedLocationClient = FusedLocationProviderClient(this)
         val locationRequest = LocationRequest.create().apply {
@@ -113,21 +116,21 @@ class MainActivity : ComponentActivity() {
         setContent {
             LonghaoTheme {
                 Surface(color = MaterialTheme.colors.background) {
-                    Column {
-                        Text("yay")
-                        MotorSlider()
-                    }
+                    App()
                 }
             }
         }
-
     }
 
     override fun onDestroy() {
         super.onDestroy()
         usbIoManager?.stop()
-        sseConnection.closeSse()
-        Log.i("info","Destroy")
+        try {
+            sseConnection.closeSse()
+        }catch(e:Exception){
+            Log.e("sseConnection","cannot close sseConnection. error:${e}")
+        }
+        Log.i("info", "Destroy")
     }
 
     private fun sendLocation(zonedDateTimeString: String) {
@@ -137,34 +140,41 @@ class MainActivity : ComponentActivity() {
                 "last_time":"$zonedDateTimeString"
             }
         """
-        Log.v("sendlocation","test")
-            postData(bodyJson,"/api/location")
+        Log.v("sendlocation", "test")
+        postData(bodyJson, "/api/location")
     }
 
-    private fun checkLocationPermission(){
+    private fun checkLocationPermission(): Boolean {
         //メモ 位置情報の権限ないと画面真っ白になる
-
-        if  (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-            ||
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)
-            ) {
-                //説明UIを表示（ほんとは）
-                Toast.makeText(this, "位置情報の権限が必要です", Toast.LENGTH_LONG).show()
+        return !(ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED
+                ||
+                ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED)
+    }
+    private val requestPermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grantStates: Map<String, Boolean> ->
+            for ((permission, granted) in grantStates) {
+                Toast.makeText(this, "$permission - $granted", Toast.LENGTH_SHORT).show()
             }
-            val requestPermission =
-                registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grantStates: Map<String,Boolean> ->
-                    for ((permission, granted) in grantStates) {
-                        Toast.makeText(this,"$permission - $granted",Toast.LENGTH_SHORT).show()
-                    }
-                }
-            requestPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
+        }
+    private fun getLocationPermission() {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) ||
+            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)
+        ) {
+            Toast.makeText(this, "位置情報の権限を許可してください", Toast.LENGTH_LONG).show()
+            requestPermission.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         } else {
-            Toast.makeText(this,"位置情報の権限は許可されています", Toast.LENGTH_LONG).show()
-            return
+            Toast.makeText(this, "設定から位置情報の権限を許可してください", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -187,9 +197,23 @@ class MainActivity : ComponentActivity() {
             """
         postData(bodyJson, "/api/battery")
     }
-}
-@Composable
-fun MotorSlider() {
+
+    @Composable
+    fun App() {
+        val navController = rememberNavController()
+        NavHost(navController, startDestination = "PermissionPage") {
+            composable(route = "MainScreen") {
+                Column {
+                    MotorSlider(navController)
+                }
+            }
+            composable(route = "PermissionPage") {
+                NeedPermissionScreen(navController)
+            }
+        }
+    }
+    @Composable
+    fun MotorSlider(navController: NavController) {
         var sliderPosition by remember { mutableStateOf(1000f) }
         val intPosition = (sliderPosition).roundToInt()
         @Composable
@@ -219,12 +243,31 @@ fun MotorSlider() {
             value = sliderPosition,
             onValueChange = {
                 sliderPosition = it.roundToInt().toFloat()
-                Log.v("sliderradio","changed")
+                Log.v("slider'sRadio","changed")
                 //usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
                 usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
                 Log.v("test", usbIoManager?.state.toString())
-                            },
+            },
             valueRange = 1000f..2000f,
             //steps = 1
-            )
+        )
     }
+
+    @Composable
+    fun NeedPermissionScreen(navController: NavController){
+        val btnString = if(checkLocationPermission()) "進む" else "権限を取得"
+        Text("位置情報の権限が必要です")
+        Button(onClick = {
+            if(checkLocationPermission()) {
+                //navController.navigate("MainScreen")
+                Toast.makeText(this,"found LocationPermission",Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this,"not found LocationPermission",Toast.LENGTH_SHORT).show()
+                getLocationPermission()
+            }
+        }){
+            Icon(Icons.Outlined.LocationOn, contentDescription = "LocationIcon",modifier = Modifier.size(ButtonDefaults.IconSize))
+            Text(btnString)
+        }
+    }
+}
