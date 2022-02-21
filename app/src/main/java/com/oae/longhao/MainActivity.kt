@@ -1,6 +1,8 @@
 package com.oae.longhao
 
 import android.Manifest
+import android.Manifest.permission.ACCESS_COARSE_LOCATION
+import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -8,6 +10,8 @@ import android.content.pm.PackageManager
 import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.os.Looper
+import android.net.Uri
+import android.provider.Settings
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -15,16 +19,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.navigation.*
@@ -97,12 +100,14 @@ class MainActivity : ComponentActivity() {
             }
         }
         /// 位置情報を更新
-        Looper.myLooper()?.let {
-            fusedLocationClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                it
-            )
+        if(checkLocationPermission()) {
+            Looper.myLooper()?.let {
+                fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    it
+                )
+            }
         }
 
 
@@ -156,10 +161,20 @@ class MainActivity : ComponentActivity() {
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 ) != PackageManager.PERMISSION_GRANTED)
     }
-    private val requestPermission =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grantStates: Map<String, Boolean> ->
-            for ((permission, granted) in grantStates) {
-                Toast.makeText(this, "$permission - $granted", Toast.LENGTH_SHORT).show()
+    private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            grant ->
+            /* 権限が大量にあって全部承認されてなきゃないときとかの処理　勿体ないから残す
+            var notFoundFalse:Boolean = true;
+            for ((_, granted) in grant) {
+                if(notFoundFalse){
+                    notFoundFalse = granted;
+                }
+            return notFoundFalse
+            }*/
+            if(grant[ACCESS_FINE_LOCATION] == true && grant[ACCESS_COARSE_LOCATION] == true){
+                Toast.makeText(this, "権限を取得しました。アプリを再起動してください。", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "権限を取得できませんでした", Toast.LENGTH_LONG).show()
             }
         }
     private fun getLocationPermission() {
@@ -175,9 +190,12 @@ class MainActivity : ComponentActivity() {
             )
         } else {
             Toast.makeText(this, "設定から位置情報の権限を許可してください", Toast.LENGTH_LONG).show()
+            val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            i.addCategory(Intent.CATEGORY_DEFAULT)
+            i.data = Uri.parse("package:com.oae.longhao")
+            startActivity(i)
         }
     }
-
     private fun sendBattery(zonedDateTimeString: String) {
         Log.v("plugged", globalVar.powerVariable[2].toString())
         //zonedDateTimeに問題あり
@@ -197,7 +215,6 @@ class MainActivity : ComponentActivity() {
             """
         postData(bodyJson, "/api/battery")
     }
-
     @Composable
     fun App() {
         val navController = rememberNavController()
@@ -210,6 +227,9 @@ class MainActivity : ComponentActivity() {
             composable(route = "PermissionPage") {
                 NeedPermissionScreen(navController)
             }
+        }
+        if(checkLocationPermission()){
+            navController.navigate("MainScreen")
         }
     }
     @Composable
@@ -252,22 +272,50 @@ class MainActivity : ComponentActivity() {
             //steps = 1
         )
     }
-
     @Composable
-    fun NeedPermissionScreen(navController: NavController){
-        val btnString = if(checkLocationPermission()) "進む" else "権限を取得"
-        Text("位置情報の権限が必要です")
-        Button(onClick = {
-            if(checkLocationPermission()) {
-                //navController.navigate("MainScreen")
-                Toast.makeText(this,"found LocationPermission",Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this,"not found LocationPermission",Toast.LENGTH_SHORT).show()
-                getLocationPermission()
+    fun NeedPermissionScreen(navController: NavController) {
+        val context = LocalContext.current
+        val contentString:Map<String,String> = if (checkLocationPermission()) {
+            mapOf("button" to "進む", "text" to "位置情報の権限は既に取得されています", "icon" to "NavigateNext")
+        } else {
+            mapOf("button" to "権限を取得", "text" to "位置情報の権限が必要です", "icon" to "LocationOn")
+        }
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column (
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+                    ){
+                contentString["text"]?.let { Text(it) }
+                Button(onClick = {
+                    if (checkLocationPermission()) {
+                        navController.navigate("MainScreen")
+                    } else {
+                        getLocationPermission()
+                    }
+                }) {
+                    contentString["icon"]?.let { IconByName(name = it) }
+                 //       modifier = Modifier.size(ButtonDefaults.IconSize)
+                    contentString["button"]?.let { Text(it) }
+                }
             }
-        }){
-            Icon(Icons.Outlined.LocationOn, contentDescription = "LocationIcon",modifier = Modifier.size(ButtonDefaults.IconSize))
-            Text(btnString)
+        }
+    }
+    @Composable
+    fun IconByName(name: String) {
+        val icon: ImageVector? = remember(name) {
+            try {
+                val cl = Class.forName("androidx.compose.material.icons.outlined.${name}Kt")
+                val method = cl.declaredMethods.first()
+                method.invoke(null, Icons.Outlined) as ImageVector
+            } catch (_: Throwable) {
+                null
+            }
+        }
+        if (icon != null) {
+            Icon(icon, "$name icon")
         }
     }
 }
