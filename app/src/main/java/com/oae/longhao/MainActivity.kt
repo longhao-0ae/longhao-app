@@ -3,6 +3,7 @@ package com.oae.longhao
 import android.Manifest
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -46,12 +47,15 @@ import kotlin.math.roundToInt
 var usbIoManager: SerialInputOutputManager? = null
 private lateinit var locationCallback: LocationCallback
 
+//TODO:そのうちLocationPermissionsをLocationに継承して位置情報関連をまとめる
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
     private lateinit var sseConnection: SseConnection
 
-    // latitude = 1,longitude = 2,altitude = 3
+    private val locationPermissions = LocationPermissions(this)
+
+    // latitude,longitude,altitude
     val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,12 +77,6 @@ class MainActivity : ComponentActivity() {
         //SseConnection("http://192.168.3.16/operation/stream")
 
         //メモ writeAsyncみたいなので送信できたはず
-
-        /*
-        if(checkLocationPermission().not()){
-            getLocationPermission()
-        }*/
-
         fusedLocationClient = FusedLocationProviderClient(this)
         val locationRequest = LocationRequest.create().apply {
             // 精度重視(電力大)と省電力重視(精度低)を両立するため2種類の更新間隔を指定
@@ -100,7 +98,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         /// 位置情報を更新
-        if(checkLocationPermission()) {
+        if(locationPermissions.checkLocationPermission()) {
             Looper.myLooper()?.let {
                 fusedLocationClient.requestLocationUpdates(
                     locationRequest,
@@ -149,53 +147,7 @@ class MainActivity : ComponentActivity() {
         postData(bodyJson, "/api/location")
     }
 
-    private fun checkLocationPermission(): Boolean {
-        //メモ 位置情報の権限ないと画面真っ白になる
-        return !(ActivityCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) != PackageManager.PERMISSION_GRANTED
-                ||
-                ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED)
-    }
-    private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            grant ->
-            /* 権限が大量にあって全部承認されてなきゃないときとかの処理　勿体ないから残す
-            var notFoundFalse:Boolean = true;
-            for ((_, granted) in grant) {
-                if(notFoundFalse){
-                    notFoundFalse = granted;
-                }
-            return notFoundFalse
-            }*/
-            if(grant[ACCESS_FINE_LOCATION] == true && grant[ACCESS_COARSE_LOCATION] == true){
-                Toast.makeText(this, "権限を取得しました。アプリを再起動してください。", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "権限を取得できませんでした", Toast.LENGTH_LONG).show()
-            }
-        }
-    private fun getLocationPermission() {
-        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) ||
-            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)
-        ) {
-            Toast.makeText(this, "位置情報の権限を許可してください", Toast.LENGTH_LONG).show()
-            requestPermission.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-        } else {
-            Toast.makeText(this, "設定から位置情報の権限を許可してください", Toast.LENGTH_LONG).show()
-            val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            i.addCategory(Intent.CATEGORY_DEFAULT)
-            i.data = Uri.parse("package:com.oae.longhao")
-            startActivity(i)
-        }
-    }
+
     private fun sendBattery(zonedDateTimeString: String) {
         Log.v("plugged", globalVar.powerVariable[2].toString())
         //zonedDateTimeに問題あり
@@ -228,7 +180,7 @@ class MainActivity : ComponentActivity() {
                 NeedPermissionScreen(navController)
             }
         }
-        if(checkLocationPermission()){
+        if(locationPermissions.checkLocationPermission()){
             navController.navigate("MainScreen")
         }
     }
@@ -274,8 +226,7 @@ class MainActivity : ComponentActivity() {
     }
     @Composable
     fun NeedPermissionScreen(navController: NavController) {
-        val context = LocalContext.current
-        val contentString:Map<String,String> = if (checkLocationPermission()) {
+        val contentString:Map<String,String> = if (locationPermissions.checkLocationPermission()) {
             mapOf("button" to "進む", "text" to "位置情報の権限は既に取得されています", "icon" to "NavigateNext")
         } else {
             mapOf("button" to "権限を取得", "text" to "位置情報の権限が必要です", "icon" to "LocationOn")
@@ -290,14 +241,13 @@ class MainActivity : ComponentActivity() {
                     ){
                 contentString["text"]?.let { Text(it) }
                 Button(onClick = {
-                    if (checkLocationPermission()) {
+                    if (locationPermissions.checkLocationPermission()) {
                         navController.navigate("MainScreen")
                     } else {
-                        getLocationPermission()
+                        locationPermissions.getLocationPermission()
                     }
                 }) {
                     contentString["icon"]?.let { IconByName(name = it) }
-                 //       modifier = Modifier.size(ButtonDefaults.IconSize)
                     contentString["button"]?.let { Text(it) }
                 }
             }
