@@ -1,8 +1,6 @@
 package com.oae.longhao
 
 import android.Manifest
-import android.Manifest.permission.ACCESS_COARSE_LOCATION
-import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -11,16 +9,13 @@ import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale
-import androidx.core.app.ComponentActivity
 
 
 class LocationPermissions(_mainContext: Context) {
     private val mainContext = _mainContext
     private val mainActivity = _mainContext as Activity
-
     private val requestPermission by lazy {
         MainActivity().registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
                 grant ->
@@ -31,15 +26,16 @@ class LocationPermissions(_mainContext: Context) {
             }
         }
     }
+
     public fun checkLocationPermission(): Boolean {
         //メモ 位置情報の権限ないと画面真っ白になる
         return !(ActivityCompat.checkSelfPermission(
-            mainContext,
+            mainActivity,
             Manifest.permission.ACCESS_FINE_LOCATION
         ) != PackageManager.PERMISSION_GRANTED
                 ||
                 ActivityCompat.checkSelfPermission(
-                    mainContext,
+                    mainActivity,
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 ) != PackageManager.PERMISSION_GRANTED)
     }

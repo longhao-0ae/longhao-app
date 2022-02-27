@@ -8,7 +8,6 @@ val phoneStateListener = object : PhoneStateListener() {
     override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
         super.onSignalStrengthsChanged(signalStrength)
         val level = signalStrength?.level
-        //んー simささないと動いてるかわからん
         Log.v("StrengthLevel", level.toString())
     }
 }

@@ -1,25 +1,17 @@
 package com.oae.longhao
 
-import android.Manifest
-import android.Manifest.permission.ACCESS_COARSE_LOCATION
-import android.Manifest.permission.ACCESS_FINE_LOCATION
-
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.os.Looper
-import android.net.Uri
 import android.provider.Settings
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.*
@@ -28,9 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.navigation.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -42,19 +32,18 @@ import java.time.LocalDateTime
 import java.util.*
 import kotlin.concurrent.schedule
 import kotlin.math.roundToInt
+import androidx.core.content.ContextCompat.startActivity
 
 
 var usbIoManager: SerialInputOutputManager? = null
 private lateinit var locationCallback: LocationCallback
 
-//TODO:そのうちLocationPermissionsをLocationに継承して位置情報関連をまとめる
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
     private lateinit var sseConnection: SseConnection
-
     private val locationPermissions = LocationPermissions(this)
-
+    private val checkLocationEnabled = CheckLocationEnabled(this)
     // latitude,longitude,altitude
     val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
 
@@ -98,7 +87,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         /// 位置情報を更新
-        if(locationPermissions.checkLocationPermission()) {
+        if(locationPermissions.checkLocationPermission() && checkLocationEnabled.statusCheck()) {
             Looper.myLooper()?.let {
                 fusedLocationClient.requestLocationUpdates(
                     locationRequest,
@@ -180,7 +169,7 @@ class MainActivity : ComponentActivity() {
                 NeedPermissionScreen(navController)
             }
         }
-        if(locationPermissions.checkLocationPermission()){
+        if(locationPermissions.checkLocationPermission() && checkLocationEnabled.statusCheck()){
             navController.navigate("MainScreen")
         }
     }
@@ -227,7 +216,11 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun NeedPermissionScreen(navController: NavController) {
         val contentString:Map<String,String> = if (locationPermissions.checkLocationPermission()) {
-            mapOf("button" to "進む", "text" to "位置情報の権限は既に取得されています", "icon" to "NavigateNext")
+            if(checkLocationEnabled.statusCheck()) {
+                mapOf("button" to "進む", "text" to "位置情報の権限と位置情報は有効です", "icon" to "NavigateNext")
+            } else {
+                mapOf("button" to "有効にする", "text" to "位置情報を有効にしてください", "icon" to "LocationOn")
+            }
         } else {
             mapOf("button" to "権限を取得", "text" to "位置情報の権限が必要です", "icon" to "LocationOn")
         }
@@ -242,7 +235,12 @@ class MainActivity : ComponentActivity() {
                 contentString["text"]?.let { Text(it) }
                 Button(onClick = {
                     if (locationPermissions.checkLocationPermission()) {
-                        navController.navigate("MainScreen")
+                        if(checkLocationEnabled.statusCheck()){
+                            navController.navigate("MainScreen")
+                        } else {
+                            val i = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                            startActivity(i)
+                        }
                     } else {
                         locationPermissions.getLocationPermission()
                     }
