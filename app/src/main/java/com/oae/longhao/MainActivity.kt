@@ -7,7 +7,6 @@ import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
-import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -21,29 +20,39 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.navigation.*
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.google.android.gms.location.*
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import com.oae.longhao.ui.theme.LonghaoTheme
 import java.time.LocalDateTime
 import java.util.*
+import kotlin.collections.Map
+import kotlin.collections.first
+import kotlin.collections.forEach
+import kotlin.collections.mapOf
+import kotlin.collections.mutableListOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.set
 import kotlin.concurrent.schedule
 import kotlin.math.roundToInt
-import androidx.core.content.ContextCompat.startActivity
 
 
 var usbIoManager: SerialInputOutputManager? = null
 private lateinit var locationCallback: LocationCallback
 
 class MainActivity : ComponentActivity() {
+    private val _mainActivity = this
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
     private lateinit var sseConnection: SseConnection
-    private val locationPermissions = LocationPermissions(this)
-    private val checkLocationEnabled = CheckLocationEnabled(this)
+    private val locationPermissions = LocationPermissions(_mainActivity as Context)
+    private val checkLocationEnabled = CheckLocationEnabled(_mainActivity)
     // latitude,longitude,altitude
     val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
 
@@ -57,16 +66,12 @@ class MainActivity : ComponentActivity() {
         val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(PhoneBatteryReceiver(), intentFilter)
 
-        //電波強度?
-        val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        tm.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS)
-
         //sse
         //有効にするの忘れないで
         //SseConnection("http://192.168.3.16/operation/stream")
 
         //メモ writeAsyncみたいなので送信できたはず
-        fusedLocationClient = FusedLocationProviderClient(this)
+        fusedLocationClient = FusedLocationProviderClient(_mainActivity)
         val locationRequest = LocationRequest.create().apply {
             // 精度重視(電力大)と省電力重視(精度低)を両立するため2種類の更新間隔を指定
             // 今回は公式のサンプル通り
@@ -96,12 +101,13 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-
-
+        val sg = signals(_mainActivity as Context)
         Timer().schedule(0, 5000) {
             val zonedDateTimeString = LocalDateTime.now().toString()
             sendBattery(zonedDateTimeString)
             sendLocation(zonedDateTimeString)
+            Log.v("signalStrength",sg.getSignalStrength().toString())
+            Log.v("ifonline",sg.isOnline().toString())
             usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
             //   this.cancel()
         }
@@ -135,7 +141,6 @@ class MainActivity : ComponentActivity() {
         Log.v("sendlocation", "test")
         postData(bodyJson, "/api/location")
     }
-
 
     private fun sendBattery(zonedDateTimeString: String) {
         Log.v("plugged", globalVar.powerVariable[2].toString())
@@ -231,7 +236,7 @@ class MainActivity : ComponentActivity() {
             Column (
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
-                    ){
+            ){
                 contentString["text"]?.let { Text(it) }
                 Button(onClick = {
                     if (locationPermissions.checkLocationPermission()) {
