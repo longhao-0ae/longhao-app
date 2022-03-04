@@ -18,7 +18,7 @@ private val mListener: SerialInputOutputManager.Listener = object : SerialInputO
         if (e.message != null){
 
         }
-        //壊れないように連結中のデータがあったら破棄
+        //TODO 壊れないように連結中のデータがあったら破棄
         Log.v("serial", "Error! Message: " + e.message.toString())
         serialMessage = ""
     }
@@ -30,11 +30,9 @@ private val mListener: SerialInputOutputManager.Listener = object : SerialInputO
         serialMessage = sb.toString()
         if (sb.toString().endsWith("}\n")){
             Log.v("received data",sb.toString())
-            //処理
             serialMessage = ""
             Log.v("serial","serialMessage is Cleared!")
         }
-
     }
 }
 
