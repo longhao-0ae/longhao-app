@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -204,25 +205,35 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        Text(text = intPosition.toString())
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = intPosition.toString())
 
-        Row(Modifier.selectableGroup()) {
-            val radioList = mutableListOf(1000, 1032, 1300, 1500, 2000)
-            radioList.forEach { OkValue: Int ->
-                radioButtonRow(OkValue)
+                Row(Modifier.selectableGroup()) {
+                    val radioList = mutableListOf(1000, 1032, 1300, 1500, 2000)
+                    radioList.forEach { OkValue: Int ->
+                        radioButtonRow(OkValue)
+                    }
+                }
+                Slider(
+                    value = sliderPosition,
+                    onValueChange = {
+                        sliderPosition = it.roundToInt().toFloat()
+                        Log.v("slider'sRadio", "changed")
+                        //usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
+                        usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
+                        Log.v("test", usbIoManager?.state.toString())
+                    },
+                    valueRange = 1000f..2000f,
+                    //steps = 1
+                )
             }
         }
-        Slider(
-            value = sliderPosition,
-            onValueChange = {
-                sliderPosition = it.roundToInt().toFloat()
-                Log.v("slider'sRadio","changed")
-                //usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
-                usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
-                Log.v("test", usbIoManager?.state.toString())
-            },
-            valueRange = 1000f..2000f,
-            //steps = 1
-        )
     }
 }
