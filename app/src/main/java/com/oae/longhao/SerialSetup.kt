@@ -10,6 +10,7 @@ import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import java.lang.Exception
 import java.util.concurrent.Executors
+var usbIoManager: SerialInputOutputManager? = null
 
 private val mListener: SerialInputOutputManager.Listener = object : SerialInputOutputManager.Listener {
     var serialMessage:String = "";
@@ -53,11 +54,15 @@ fun setupSerial(manager: UsbManager){
         // USBデバイスへのアクセス権限がなかった時の処理
         return
 
-    val port = driver.ports[0]
-    port.open(connection)
-    port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-    port.write("Start".toByteArray(Charsets.UTF_8),2000)
-    Log.v("USB","connection success!")
-    usbIoManager = SerialInputOutputManager(port, mListener)
-    Executors.newSingleThreadExecutor().submit(usbIoManager)
+    port = driver.ports[0]
+    if(port != null) {
+        port?.open(connection)
+        port?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+        port?.dtr = true;
+        port?.write("Start".toByteArray(Charsets.UTF_8), 2000)
+        Log.v("USB", "connection success!")
+        usbIoManager = SerialInputOutputManager(port as UsbSerialPort?, mListener)
+        usbIoManager?.start()
+        Executors.newSingleThreadExecutor().submit(usbIoManager)
+    }
 }
