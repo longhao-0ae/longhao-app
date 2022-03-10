@@ -20,36 +20,4 @@ class CheckLocationEnabled(_mainActivity: Activity) {
             false
         }
     }
-/*
-    @Composable
-    private fun buildAlertMessageNoGps() {
-        AlertDialog(
-            onDismissRequest = {   },
-            title = {
-                Text(text = "位置情報を使いますか？")
-            },
-            text = {
-                Text("GPSから位置情報を取得するとタイムラインを自動記録できます。")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val i = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                        mainContext.startActivity(i)
-                    }
-                ) {
-                    Text("使う")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        mainActivity.finish()
-                    }
-                ) {
-                    Text("キャンセル")
-                }
-            },
-        )
-    }*/
 }

@@ -35,10 +35,10 @@ class SseConnection(url: String) {
                     Log.v("helm",parsedMessage.second.toString())
                     if (parsedMessage.first in 1000..2000){
                         Log.v("write","ok")
-                        usbIoManager?.writeAsync(parsedMessage.first.toString().toByteArray(Charsets.UTF_8))
+                        port?.write(parsedMessage.first.toString().toByteArray(Charsets.UTF_8),2000)
                     } else {
                         Log.v("wr","over 2000 or min 1000")
-                        usbIoManager?.writeAsync("1000".toByteArray(Charsets.UTF_8))
+                        port?.write("1000".toByteArray(Charsets.UTF_8),2000)
                     }
                 }
             }

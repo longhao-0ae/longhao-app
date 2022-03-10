@@ -39,7 +39,6 @@ class LocationPermissions(_mainContext: Context) {
     }
 
     public fun checkLocationPermission(): Boolean {
-        //メモ 位置情報の権限ないと画面真っ白になる
         return !(ActivityCompat.checkSelfPermission(
             mainActivity,
             Manifest.permission.ACCESS_FINE_LOCATION
