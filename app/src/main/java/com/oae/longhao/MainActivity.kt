@@ -24,6 +24,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
+import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import com.oae.longhao.ui.theme.LonghaoTheme
 import java.time.LocalDateTime
@@ -35,8 +36,7 @@ import kotlin.collections.set
 import kotlin.concurrent.schedule
 import kotlin.math.roundToInt
 
-
-var usbIoManager: SerialInputOutputManager? = null
+public var port: UsbSerialPort? = null
 private lateinit var locationCallback: LocationCallback
 
 
@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
             sendLocation(zonedDateTimeString)
             Log.v("signalStrength",sg.getSignalStrength().toString())
             Log.v("ifOnline",sg.isOnline().toString())
-            usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
+            //port?.write("1032".toByteArray(Charsets.UTF_8),2000)
             //   this.cancel()
         }
         setContent {
@@ -131,7 +131,7 @@ class MainActivity : ComponentActivity() {
                 "last_time":"$zonedDateTimeString"
             }
         """
-        Log.v("sendlocation", "test")
+        Log.v("sendLocation", "test")
         postData(bodyJson, "/api/location")
     }
 
@@ -188,15 +188,8 @@ class MainActivity : ComponentActivity() {
                 selected = sliderPosition == OkValue.toFloat(),
                 onClick = {
                     sliderPosition = OkValue.toFloat()
-                    if(usbIoManager != null){
-                        Log.v("usbioman","yes")
-                        Log.v("usbioman",usbIoManager.toString())
-                        usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
+                    port?.write(intPosition.toString().toByteArray(Charsets.UTF_8),2000)
                     //TODO USBioManagerとportの関係に関連がありそう 調べる
-                    //usbIoManager?.
-                    }else{
-                        Log.v("usbioman","no")
-                    }
                 }
             )
             Text(
@@ -226,9 +219,8 @@ class MainActivity : ComponentActivity() {
                     onValueChange = {
                         sliderPosition = it.roundToInt().toFloat()
                         Log.v("slider'sRadio", "changed")
-                        //usbIoManager?.writeAsync(intPosition.toString().toByteArray(Charsets.UTF_8))
-                        usbIoManager?.writeAsync("1032".toByteArray(Charsets.UTF_8))
-                        Log.v("test", usbIoManager?.state.toString())
+                        //intPosition.toString().toByteArray(Charsets.UTF_8)
+                        port?.write("1032".toByteArray(Charsets.UTF_8),2000)
                     },
                     valueRange = 1000f..2000f,
                     //steps = 1
