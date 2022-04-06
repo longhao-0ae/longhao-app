@@ -11,42 +11,38 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager
 import java.lang.Exception
 import java.util.concurrent.Executors
 var usbIoManager: SerialInputOutputManager? = null
-
 private val mListener: SerialInputOutputManager.Listener = object : SerialInputOutputManager.Listener {
-    var serialMessage:String = "";
+    var serialMessage = "";
 
     override fun onRunError(e: Exception) {
         if (e.message != null){
-
+            Log.v("serial", "Error! Message: " + e.message.toString())
+        } else {
+            Log.v("serial", "Unknown Error!")
         }
-        //TODO 壊れないように連結中のデータがあったら破棄
-        Log.v("serial", "Error! Message: " + e.message.toString())
         serialMessage = ""
     }
 
     override fun onNewData(data: ByteArray) {
-        val sb = StringBuilder()
-        sb.append(serialMessage)
-        sb.append(String(data,Charsets.UTF_8))
-        serialMessage = sb.toString()
-        if (sb.toString().endsWith("}\n")){
-            Log.v("received data",sb.toString())
+        serialMessage = StringBuilder().append(serialMessage).append(String(data,Charsets.UTF_8)).toString()
+        if (serialMessage.endsWith("}\n")){
+            Log.v("received Message",serialMessage)
             serialMessage = ""
-            Log.v("serial","serialMessage is Cleared!")
         }
     }
 }
+
 
 fun setupSerial(manager: UsbManager){
     val availableDrivers: List<UsbSerialDriver> =
         UsbSerialProber.getDefaultProber().findAllDrivers(manager)
     if (availableDrivers.isEmpty()) {
-        Log.v("USB","driver not found")
+        Log.v("USB","driver not found.")
         return
     }
     val driver = availableDrivers[0]
     if (driver.ports.size < 0) {
-        Log.v("USB", "connection failed,reason -> not enough ports at device")
+        Log.v("USB", "connection failed. reason -> not enough ports at device")
         return
     }
     val connection = manager.openDevice(driver.device)
@@ -59,7 +55,7 @@ fun setupSerial(manager: UsbManager){
         port?.open(connection)
         port?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
         port?.dtr = true;
-        port?.write("Start".toByteArray(Charsets.UTF_8), 2000)
+       // port?.write("{\"motor\":\"114514\"}".toByteArray(Charsets.UTF_8), 2000)
         Log.v("USB", "connection success!")
         usbIoManager = SerialInputOutputManager(port as UsbSerialPort?, mListener)
         usbIoManager?.start()
