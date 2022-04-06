@@ -6,6 +6,7 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -42,6 +43,7 @@ private lateinit var locationCallback: LocationCallback
 
 class MainActivity : ComponentActivity() {
     private val _mainActivity = this
+    val timer = Timer()
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
     private val sg = Signals(_mainActivity as Context)
@@ -55,6 +57,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setupSerial(getSystemService(USB_SERVICE) as UsbManager)
         appSettings(window)
+        /*
         Location().test()
 
         //バッテリ
@@ -86,6 +89,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        /*
         /// 位置情報を更新
         if(locationPermissions.checkLocationPermission() && checkLocationEnabled.statusCheck()) {
             Looper.myLooper()?.let {
@@ -96,15 +100,18 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        Timer().schedule(0, 5000) {
+        */
+
+        timer.schedule(0, 5000) {
             val zonedDateTimeString = LocalDateTime.now().toString()
             sendBattery(zonedDateTimeString)
             sendLocation(zonedDateTimeString)
             Log.v("signalStrength",sg.getSignalStrength().toString())
             Log.v("ifOnline",sg.isOnline().toString())
             //port?.write("1032".toByteArray(Charsets.UTF_8),2000)
-            //   this.cancel()
         }
+        */
+
         setContent {
             LonghaoTheme {
                 Surface(color = MaterialTheme.colors.background) {
@@ -116,6 +123,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         usbIoManager?.stop()
+        port?.close()
+        timer.cancel()
         try {
             sseConnection.closeSse()
         }catch(e:Exception){
@@ -131,7 +140,6 @@ class MainActivity : ComponentActivity() {
                 "last_time":"$zonedDateTimeString"
             }
         """
-        Log.v("sendLocation", "test")
         postData(bodyJson, "/api/location")
     }
 
@@ -160,7 +168,8 @@ class MainActivity : ComponentActivity() {
         NavHost(navController, startDestination = "PermissionPage") {
             composable(route = "MainScreen") {
                 Column {
-                    MotorSlider(navController)
+                    //MotorSlider(navController)
+                    DebuggingBtn()
                 }
             }
             composable(route = "PermissionPage") {
@@ -220,11 +229,40 @@ class MainActivity : ComponentActivity() {
                         sliderPosition = it.roundToInt().toFloat()
                         Log.v("slider'sRadio", "changed")
                         //intPosition.toString().toByteArray(Charsets.UTF_8)
-                        port?.write("1032".toByteArray(Charsets.UTF_8),2000)
+                        port?.write("{\"motor\":\"114514\"}".toByteArray(Charsets.UTF_8),100)
                     },
                     valueRange = 1000f..2000f,
                     //steps = 1
                 )
+            }
+        }
+    }
+    @Composable
+    fun DebuggingBtn(){
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("デバッグ用")
+                Button(onClick = {
+                    port?.write("{\"motor\":\"1032\"}".toByteArray(Charsets.UTF_8),100)
+                }) {
+                    Text("1032")
+                }
+                Button(onClick = {
+                    port?.write("{\"motor\":\"114514\"}".toByteArray(Charsets.UTF_8),100)
+                }) {
+                    Text("114514")
+                }
+                Button(onClick = {
+                    port?.write("{\"motor\":\"123456\"}".toByteArray(Charsets.UTF_8),100)
+                }) {
+                    Text("123456")
+                }
             }
         }
     }
