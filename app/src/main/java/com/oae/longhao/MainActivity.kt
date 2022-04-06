@@ -6,7 +6,6 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.os.Looper
-import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,7 +25,6 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.hoho.android.usbserial.driver.UsbSerialPort
-import com.hoho.android.usbserial.util.SerialInputOutputManager
 import com.oae.longhao.ui.theme.LonghaoTheme
 import java.time.LocalDateTime
 import java.util.*
@@ -38,69 +36,29 @@ import kotlin.concurrent.schedule
 import kotlin.math.roundToInt
 
 public var port: UsbSerialPort? = null
-private lateinit var locationCallback: LocationCallback
-
 
 class MainActivity : ComponentActivity() {
     private val _mainActivity = this
     val timer = Timer()
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
     val globalVar = globalVariable.getInstance()
     private val sg = Signals(_mainActivity as Context)
     private lateinit var sseConnection: SseConnection
     private val locationPermissions = LocationPermissions(_mainActivity as Context)
     private val checkLocationEnabled = CheckLocationEnabled(_mainActivity)
-    // latitude,longitude,altitude
-    val locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
-
+    private val locationClass = Location(_mainActivity)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setupSerial(getSystemService(USB_SERVICE) as UsbManager)
         appSettings(window)
-        /*
-        Location().test()
-
+        locationClass.start()
         //バッテリ
         val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(PhoneBatteryReceiver(), intentFilter)
-
         //sse
         //有効にするの忘れないで
         //SseConnection("http://192.168.3.16/operation/stream")
 
         //メモ writeAsyncみたいなので送信できたはず
-        fusedLocationClient = FusedLocationProviderClient(_mainActivity)
-        val locationRequest = LocationRequest.create().apply {
-            // 精度重視(電力大)と省電力重視(精度低)を両立するため2種類の更新間隔を指定
-            // 今回は公式のサンプル通り
-            interval = 10000                                   // 最遅の更新間隔(但し不正確)
-            fastestInterval = 5000                             // 最短の更新間隔
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY  // 精度重視
-        }
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult) {
-                for (location in locationResult.locations) {
-                    if (location != null) {
-                        locationVariable[1] = location.latitude
-                        locationVariable[2] = location.longitude
-                        locationVariable[3] = location.altitude
-                        Log.v("updated", "gps")
-                    }
-                }
-            }
-        }
-        /*
-        /// 位置情報を更新
-        if(locationPermissions.checkLocationPermission() && checkLocationEnabled.statusCheck()) {
-            Looper.myLooper()?.let {
-                fusedLocationClient.requestLocationUpdates(
-                    locationRequest,
-                    locationCallback,
-                    it
-                )
-            }
-        }
-        */
 
         timer.schedule(0, 5000) {
             val zonedDateTimeString = LocalDateTime.now().toString()
@@ -108,9 +66,8 @@ class MainActivity : ComponentActivity() {
             sendLocation(zonedDateTimeString)
             Log.v("signalStrength",sg.getSignalStrength().toString())
             Log.v("ifOnline",sg.isOnline().toString())
-            //port?.write("1032".toByteArray(Charsets.UTF_8),2000)
         }
-        */
+
 
         setContent {
             LonghaoTheme {
@@ -125,6 +82,7 @@ class MainActivity : ComponentActivity() {
         usbIoManager?.stop()
         port?.close()
         timer.cancel()
+        locationClass.stop()
         try {
             sseConnection.closeSse()
         }catch(e:Exception){
@@ -134,6 +92,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sendLocation(zonedDateTimeString: String) {
+        val locationVariable = locationClass.getValue()
         val bodyJson = """
             {
                 "location":[${locationVariable[2].toString()},${locationVariable[1].toString()}],
@@ -168,8 +127,8 @@ class MainActivity : ComponentActivity() {
         NavHost(navController, startDestination = "PermissionPage") {
             composable(route = "MainScreen") {
                 Column {
-                    //MotorSlider(navController)
-                    DebuggingBtn()
+                    MotorSlider(navController)
+                    // DebuggingBtn()
                 }
             }
             composable(route = "PermissionPage") {
@@ -187,6 +146,7 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    // メモ 一個前のが送信される
     @Composable
     fun MotorSlider(navController: NavController) {
         var sliderPosition by remember { mutableStateOf(1000f) }
@@ -197,8 +157,8 @@ class MainActivity : ComponentActivity() {
                 selected = sliderPosition == OkValue.toFloat(),
                 onClick = {
                     sliderPosition = OkValue.toFloat()
-                    port?.write(intPosition.toString().toByteArray(Charsets.UTF_8),2000)
-                    //TODO USBioManagerとportの関係に関連がありそう 調べる
+                    val value = intPosition.toString()
+                    port?.write("{\"motor\":\"$value\"}".toByteArray(Charsets.UTF_8),100)
                 }
             )
             Text(
@@ -228,8 +188,8 @@ class MainActivity : ComponentActivity() {
                     onValueChange = {
                         sliderPosition = it.roundToInt().toFloat()
                         Log.v("slider'sRadio", "changed")
-                        //intPosition.toString().toByteArray(Charsets.UTF_8)
-                        port?.write("{\"motor\":\"114514\"}".toByteArray(Charsets.UTF_8),100)
+                        val value = intPosition.toString()
+                        port?.write("{\"motor\":\"$value\"}".toByteArray(Charsets.UTF_8),100)
                     },
                     valueRange = 1000f..2000f,
                     //steps = 1
