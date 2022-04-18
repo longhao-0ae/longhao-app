@@ -34,11 +34,10 @@ class SseConnection(url: String) {
                     Log.v("motor",parsedMessage.first.toString())
                     Log.v("helm",parsedMessage.second.toString())
                     if (parsedMessage.first in 1000..2000){
-                        Log.v("write","ok")
                         val value = parsedMessage.first.toString()
                         port?.write("{\"motor\":\"$value\"}".toByteArray(Charsets.UTF_8),100)
                     } else {
-                        Log.v("wr","over 2000 or min 1000")
+                        Log.v("SSEwrite","over 2000 or min 1000")
                         port?.write("{\"motor\":\"1000\"}".toByteArray(Charsets.UTF_8),100)
                     }
                 }

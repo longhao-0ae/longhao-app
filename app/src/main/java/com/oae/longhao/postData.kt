@@ -21,7 +21,7 @@ fun postData(RawBodyJson: String, ApiPoint: String){
                 is Result.Failure -> {
                     when (response.statusCode) {
                         -1 -> {
-                            Log.e(url,"Err: Unknown Error(Network?)")
+                            Log.e(url,"Err: " + result.getException().toString())
                         }
                         500 -> {
                             Log.e(url,"Err: ServerError")

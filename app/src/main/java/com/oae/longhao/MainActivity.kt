@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbManager
 import android.os.Bundle
-import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,18 +19,12 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.oae.longhao.ui.theme.LonghaoTheme
 import java.time.LocalDateTime
 import java.util.*
 import kotlin.collections.forEach
 import kotlin.collections.mutableListOf
-import kotlin.collections.mutableMapOf
-import kotlin.collections.set
 import kotlin.concurrent.schedule
 import kotlin.math.roundToInt
 
@@ -56,18 +49,22 @@ class MainActivity : ComponentActivity() {
         registerReceiver(PhoneBatteryReceiver(), intentFilter)
         //sse
         //有効にするの忘れないで
-        //SseConnection("http://192.168.3.16/operation/stream")
-
-        //メモ writeAsyncみたいなので送信できたはず
-
+        SseConnection("http://192.168.3.16/operation/stream")
         timer.schedule(0, 5000) {
             val zonedDateTimeString = LocalDateTime.now().toString()
-            sendBattery(zonedDateTimeString)
-            sendLocation(zonedDateTimeString)
+            if(sg.isOnline()){
+                sendLocation(zonedDateTimeString)
+            }
             Log.v("signalStrength",sg.getSignalStrength().toString())
             Log.v("ifOnline",sg.isOnline().toString())
         }
 
+        timer.schedule(0, 60000) {
+            val zonedDateTimeString = LocalDateTime.now().toString()
+            if(sg.isOnline()){
+                sendBattery(zonedDateTimeString)
+            }
+        }
 
         setContent {
             LonghaoTheme {
@@ -88,7 +85,6 @@ class MainActivity : ComponentActivity() {
         }catch(e:Exception){
             Log.e("sseConnection","cannot close sseConnection. error:${e}")
         }
-        Log.i("info", "Destroy")
     }
 
     private fun sendLocation(zonedDateTimeString: String) {
