@@ -9,7 +9,6 @@ import com.google.android.gms.location.*
 class Location(_mainActivity: Activity){
     private val mainActivity = _mainActivity
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val locationPermissions = LocationPermissions(mainActivity as Context)
     private val checkLocationEnabled = CheckLocationEnabled(mainActivity)
     // latitude,longitude,altitude
     var locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
@@ -36,7 +35,7 @@ class Location(_mainActivity: Activity){
     public fun start() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(mainActivity)
         /// 位置情報を更新
-        if (locationPermissions.checkLocationPermission() && checkLocationEnabled.statusCheck()) {
+        if (checkLocationPermission(mainActivity) && checkLocationEnabled.statusCheck()) {
             Looper.myLooper()?.let {
                 fusedLocationClient.requestLocationUpdates(
                     locationRequest,

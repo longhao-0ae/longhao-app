@@ -36,13 +36,31 @@ class MainActivity : ComponentActivity() {
     val globalVar = globalVariable.getInstance()
     private val sg = Signals(_mainActivity as Context)
     private lateinit var sseConnection: SseConnection
-    private val locationPermissions = LocationPermissions(_mainActivity as Context)
+    private val permissions = Permissions(_mainActivity as Context)
     private val checkLocationEnabled = CheckLocationEnabled(_mainActivity)
     private val locationClass = Location(_mainActivity)
+    private val settings = """
+    [
+        {
+            "Permissions":[
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION"
+            ],
+            "Name":"位置情報"
+        },
+        {
+            "Permissions":[
+                "android.permission.READ_PHONE_STATE"
+            ],
+            "Name":"電話情報"
+        }
+    ]
+        """
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setupSerial(getSystemService(USB_SERVICE) as UsbManager)
         appSettings(window)
+       // permissions.meinnkamo(settings)
         locationClass.start()
         //バッテリ
         val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -55,7 +73,7 @@ class MainActivity : ComponentActivity() {
             if(sg.isOnline()){
                 sendLocation(zonedDateTimeString)
             }
-            Log.v("signalStrength",sg.getSignalStrength().toString())
+           // Log.v("signalStrength",sg.getSignalStrength().toString())
             Log.v("ifOnline",sg.isOnline().toString())
         }
 
@@ -128,20 +146,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
             composable(route = "PermissionPage") {
-                locationPermissions.NeedPermissionScreen(navController)
+                permissions.NeedPermissionScreen(navController, settings)
             }
             composable(route = "NeedNetwork") {
                 sg.NeedNetworkScreen(navController)
             }
-        }
-        if(locationPermissions.checkLocationPermission() && checkLocationEnabled.statusCheck()){
-            if(sg.isOnline().not()){
-                navController.navigate("NeedNetwork")
-            } else {
-                navController.navigate("MainScreen")
+            composable(route = "NeedLocation") {
+                checkLocationEnabled.NeedLocationScreen(navController)
             }
         }
+
+        if(sg.isOnline().not()){
+            navController.navigate("NeedNetwork")
+        } else if(!checkLocationEnabled.statusCheck()){
+            navController.navigate("NeedLocation")
+        }
     }
+
     // メモ 一個前のが送信される
     @Composable
     fun MotorSlider(navController: NavController) {
