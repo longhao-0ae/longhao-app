@@ -1,8 +1,10 @@
 package com.oae.longhao
+
+import android.Manifest
 import android.app.Activity
 import android.content.Context
-import android.content.Context.LOCATION_SERVICE
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.provider.Settings
 import android.util.Log
@@ -15,22 +17,33 @@ import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LocationOff
-import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 
-
-class CheckLocationEnabled(_mainActivity: Activity) {
+class LocationUsable(_mainActivity: Activity) {
     private val mainActivity = _mainActivity
 
-    fun statusCheck(): Boolean {
-        val manager = mainActivity.getSystemService(LOCATION_SERVICE) as LocationManager?
+    public fun checkLocationPermission(): Boolean {
+        return !(ActivityCompat.checkSelfPermission(
+            mainActivity,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED
+                ||
+                ActivityCompat.checkSelfPermission(
+                    mainActivity,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED)
+    }
+
+    fun checkLocationEnabled(): Boolean {
+        val manager = mainActivity.getSystemService(Context.LOCATION_SERVICE) as LocationManager?
         return if(manager != null) {
             manager.isProviderEnabled(LocationManager.GPS_PROVIDER)
         } else {
-            Log.v("CheckLocationEnabled/statusCheck","manager not found")
+            Log.v("checkLocationEnabled","manager not found")
             false
         }
     }

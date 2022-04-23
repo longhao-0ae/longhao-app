@@ -30,46 +30,6 @@ import java.lang.reflect.Type
 class Permissions(_MainContext: Context) {
     private val mainContext = _MainContext
     private val mainActivity = _MainContext as Activity
-    /*init {
-        val settings = """
-    [
-        {
-            "Permissions":[
-                "android.permission.ACCESS_FINE_LOCATION",
-                "android.permission.ACCESS_COARSE_LOCATION"
-            ],
-            "Name":"位置情報"
-        },
-        {
-            "Permissions":[
-                "android.permission.READ_PHONE_STATE"
-            ],
-            "Name":"電話情報"
-        }
-    ]
-        """
-       meinnkamo(settings)
-    }*/
-/*
-    public fun meinnkamo (settings: String){
-        parseJson(settings)?.forEach { elem ->
-            var permList = arrayOf<String>();
-            elem.Permissions.forEach { permElem ->
-                if(!checkPermission(permElem)){
-                    permList += permElem;
-                }
-            }
-            if(permList.isNotEmpty()) {
-                Log.v("permList", permList.contentToString())
-                if(shouldDisplayAuthorityAcquisition(permList)){
-                    getPermission(permList,elem.Name)
-                } else {
-                    openPermissionSettings(elem.Name)
-                }
-            }
-        }
-    }*/
-
     private val requestPermission by lazy {
         MainActivity().registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grant ->
             if (grant[Manifest.permission.ACCESS_FINE_LOCATION] == true && grant[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {

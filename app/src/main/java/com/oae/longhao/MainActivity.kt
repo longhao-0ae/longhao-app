@@ -35,9 +35,9 @@ class MainActivity : ComponentActivity() {
     val timer = Timer()
     val globalVar = globalVariable.getInstance()
     private val sg = Signals(_mainActivity as Context)
+    private val locationUsable = LocationUsable(_mainActivity)
     private lateinit var sseConnection: SseConnection
     private val permissions = Permissions(_mainActivity as Context)
-    private val checkLocationEnabled = CheckLocationEnabled(_mainActivity)
     private val locationClass = Location(_mainActivity)
     private val settings = """
     [
@@ -60,7 +60,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setupSerial(getSystemService(USB_SERVICE) as UsbManager)
         appSettings(window)
-       // permissions.meinnkamo(settings)
         locationClass.start()
         //バッテリ
         val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -152,13 +151,13 @@ class MainActivity : ComponentActivity() {
                 sg.NeedNetworkScreen(navController)
             }
             composable(route = "NeedLocation") {
-                checkLocationEnabled.NeedLocationScreen(navController)
+                locationUsable.NeedLocationScreen(navController)
             }
         }
 
         if(sg.isOnline().not()){
             navController.navigate("NeedNetwork")
-        } else if(!checkLocationEnabled.statusCheck()){
+        } else if(!locationUsable.checkLocationEnabled()){
             navController.navigate("NeedLocation")
         }
     }
