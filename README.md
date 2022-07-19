@@ -24,6 +24,5 @@ Future task2 : des4, after des3, 5d
 
 ## TODO
 
-- [ ] CheckLocationEnabledとCheckLocationPermissionsをCheckLocationUsableに統合
 - [x] 権限周りを統合
 - [ ] 脱GMS

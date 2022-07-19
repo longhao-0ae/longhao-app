@@ -46,6 +46,7 @@ class Permissions(_MainContext: Context) {
             Permission
         ) == PackageManager.PERMISSION_GRANTED
     }
+
     private fun shouldDisplayAuthorityAcquisition(Permission: Array<String>): Boolean {
         Permission.forEach { elem ->
             if(!ActivityCompat.shouldShowRequestPermissionRationale(mainActivity, elem)){

@@ -26,7 +26,7 @@ import androidx.navigation.NavController
 class LocationUsable(_mainActivity: Activity) {
     private val mainActivity = _mainActivity
 
-    public fun checkLocationPermission(): Boolean {
+    fun checkLocationPermission(): Boolean {
         return !(ActivityCompat.checkSelfPermission(
             mainActivity,
             Manifest.permission.ACCESS_FINE_LOCATION

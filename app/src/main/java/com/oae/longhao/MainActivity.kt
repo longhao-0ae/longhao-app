@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbManager
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -15,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -28,12 +28,12 @@ import kotlin.collections.mutableListOf
 import kotlin.concurrent.schedule
 import kotlin.math.roundToInt
 
-public var port: UsbSerialPort? = null
+var port: UsbSerialPort? = null
 
 class MainActivity : ComponentActivity() {
     private val _mainActivity = this
-    val timer = Timer()
-    val globalVar = globalVariable.getInstance()
+    private val timer = Timer()
+    private val globalVar = globalVariable.getInstance()
     private val sg = Signals(_mainActivity as Context)
     private val locationUsable = LocationUsable(_mainActivity)
     private lateinit var sseConnection: SseConnection
@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
         }
     ]
         """
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setupSerial(getSystemService(USB_SERVICE) as UsbManager)
@@ -71,8 +72,22 @@ class MainActivity : ComponentActivity() {
             val zonedDateTimeString = LocalDateTime.now().toString()
             if(sg.isOnline()){
                 sendLocation(zonedDateTimeString)
+                val netType = sg.checkNetworkType()
+                if(netType == 1){
+                    postData(sg.getWifiInfo(), "/api/signal")
+                } else if (netType == 2){
+                    val bodyJson = String.format(
+                        """
+                            {
+                                "type": "MOBILE"
+                                "signalStrength": "%s",
+                            }
+                        """,
+                        sg.getSignalStrength()
+                    ).trimIndent()
+                    postData(bodyJson, "/api/signal")
+                }
             }
-           // Log.v("signalStrength",sg.getSignalStrength().toString())
             Log.v("ifOnline",sg.isOnline().toString())
         }
 
@@ -103,7 +118,6 @@ class MainActivity : ComponentActivity() {
             Log.e("sseConnection","cannot close sseConnection. error:${e}")
         }
     }
-
     private fun sendLocation(zonedDateTimeString: String) {
         val locationVariable = locationClass.getValue()
         val bodyJson = """
@@ -114,7 +128,6 @@ class MainActivity : ComponentActivity() {
         """
         postData(bodyJson, "/api/location")
     }
-
     private fun sendBattery(zonedDateTimeString: String) {
         Log.v("plugged", globalVar.powerVariable[2].toString())
         //zonedDateTimeに問題あり
@@ -140,7 +153,7 @@ class MainActivity : ComponentActivity() {
         NavHost(navController, startDestination = "PermissionPage") {
             composable(route = "MainScreen") {
                 Column {
-                    MotorSlider(navController)
+                    MotorSlider()
                     // DebuggingBtn()
                 }
             }
@@ -164,7 +177,7 @@ class MainActivity : ComponentActivity() {
 
     // メモ 一個前のが送信される
     @Composable
-    fun MotorSlider(navController: NavController) {
+    fun MotorSlider() {
         var sliderPosition by remember { mutableStateOf(1000f) }
         val intPosition = (sliderPosition).roundToInt()
         @Composable

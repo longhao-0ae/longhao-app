@@ -12,7 +12,7 @@ class Location(_mainActivity: Activity){
     private val locationUsable = LocationUsable(mainActivity)
     // latitude,longitude,altitude
     var locationVariable = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0)
-    val locationRequest = LocationRequest.create().apply {
+    private val locationRequest = LocationRequest.create().apply {
         // 精度重視(電力大)と省電力重視(精度低)を両立するため2種類の更新間隔を指定
         interval = 1000
         fastestInterval = 100
